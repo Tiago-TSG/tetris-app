@@ -4,7 +4,7 @@ Uma versão moderna, estilosa e extremamente sofisticada do clássico jogo **Tet
 
 ## 🎨 Interface do Jogo
 
-![Tela do Jogo Tetris Neon](screenshot.jpg)
+![Tela do Jogo Tetris Neon](tetris-app.jpg)
 
 *Visualização da interface com estilo neon synthwave, exibindo o canvas do jogo (centro), controles (esquerda), próximas peças e estatísticas (direita) com sistema de ranking integrado.*
 
