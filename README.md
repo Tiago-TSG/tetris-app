@@ -1,8 +1,8 @@
-# 🕹️ Retro Neon Tetris — Cloud Run Arcade (Event-Driven CQRS Edition)
+# 🕹️ Retro Neon Tetris — Cloud Run Arcade (Microservices Saga & Anti-Cheat Edition)
 
 Uma versão moderna, estilosa e extremamente sofisticada do clássico jogo **Tetris**, projetada com visual retro-wave/neon (Synthwave) e **Sintetizador de Áudio Procedural** nativo no navegador (usando a Web Audio API).
 
-Esta versão (Checkpoint 02) evoluiu para uma **Arquitetura Orientada a Eventos (Event-Driven) de altíssimo desempenho**, integrando **Google Cloud Pub/Sub**, **Firestore** e aplicando o padrão **CQRS (Command and Query Responsibility Segregation)** com Visão Materializada de Cache.
+Esta versão (Checkpoint 03) evoluiu para uma **Arquitetura baseada em Microserviços e Orquestração Avançada (Saga Pattern & Decision Trees)**, introduzindo uma Loja de Temas dinâmica, Motor Anti-Cheat com IA Heurística e Transações Compensatórias para garantia de consistência, construídas sobre a base Event-Driven e CQRS das versões anteriores.
 
 ## 🎨 Interface do Jogo
 
@@ -25,7 +25,7 @@ Este aplicativo foi planejado e otimizado especificamente para rodar localmente 
 
 ---
 
-## 🏛️ Evolução Arquitetural (Fase 1, 2 e 3)
+## 🏛️ Evolução Arquitetural (Fases 1 a 4)
 
 O projeto original usava armazenamento local em disco, o que é incompatível com a natureza Serverless Efêmera do Cloud Run. O sistema foi refatorado nas seguintes fases:
 
@@ -45,26 +45,36 @@ A arquitetura foi expandida para suportar monitoramento de eventos ao vivo duran
 2.  **Barramento de Mensageria:** A API despacha esses eventos para um segundo tópico do Pub/Sub (`telemetry-topic`).
 3.  **Coreografia Autônoma:** Um Webhook secundário (`/api/internal/telemetry-worker`) ouve a fila, atualiza os contadores globais do jogador e roda o "Motor de Regras" para conceder medalhas na coleção `achievements`, de forma totalmente desacoplada do salvamento principal de scores.
 
+### Fase 4: Microserviços, Orquestração e Anti-Cheat com IA
+O sistema monolítico foi refatorado e expandido adotando padrões modernos de orquestração distribuída (simulando capacidades do Google Cloud Workflows):
+1. **APIs Atômicas (Desacoplamento):** Lógicas separadas em microserviços virtuais: Carteira Virtual (Moedas), Inventário de Temas, Gestão de Contas (Banimentos) e Validação de Segurança.
+2. **Loja de Skins (Padrão Saga):** Novo fluxo orquestrado `buy_skin_workflow`. Ao comprar um tema, o serviço debita a carteira e desbloqueia no inventário. Se houver falha, ele executa uma **transação compensatória (rollback)** para reembolsar o saldo, garantindo consistência atômica.
+3. **Validação de Scores (Árvore de Decisão e Anti-Cheat):** O envio de placar passa pelo fluxo `submit_score_workflow`. Um Motor Heurístico analisa a cadência dos toques do teclado: Se detectar bot, bane permanentemente. Se for humano, recompensa o usuário com moedas virtuais além de registrar o placar.
+4. **Terminal Maestro e UI Didática:** Introdução de um console interativo estilo hacker no front-end para visualizar a orquestração em tempo real.
+5. **Engine de Áudio Expandida:** Sintetizador turbinado de 1 para 6 oitavas de cobertura (C2 a B7), com script matemático para compilar clássicos (Senhor dos Anéis em BPM perfeito, Star Wars, Pink Panther) renderizados no Web Audio API nativo.
+
 ---
 
 ## 🛠️ Arquitetura do Projeto
 
 ```text
 ├── backend/
-│   ├── main.py              # Servidor FastAPI com rotas de API, CQRS e Pub/Sub Webhook
-│   ├── requirements.txt     # Dependências de bibliotecas Python
-│   └── test_main.py         # Suíte de testes automatizados do backend
-├── static/                  # Pasta com os ativos de frontend servidos pelo FastAPI
+│   ├── main.py                # Servidor FastAPI com APIs atômicas, CQRS, Maestro Simulador e Webhooks
+│   ├── requirements.txt       # Dependências de bibliotecas Python
+│   └── test_main.py           # Suíte de testes automatizados do backend
+├── static/                    # Pasta com os ativos de frontend servidos pelo FastAPI
 │   ├── css/
-│   │   └── style.css        # Estilos modernos neon, grade e animações
+│   │   └── style.css          # Estilos modernos neon, grade e animações
 │   ├── js/
-│   │   ├── api.js           # Funções de chamada HTTP assíncronas para o Placar (UI Otimista)
-│   │   └── game.js          # Lógica do jogo, renderização Canvas e sintetizador de som
-│   └── index.html           # Esqueleto da página e modais do jogo
-├── Dockerfile               # Instruções de montagem da imagem Docker (Cloud Run)
-├── .dockerignore            # Exclusão de arquivos desnecessários na imagem Docker
-├── .gitignore               # Exclusão de arquivos de versionamento e venv
-└── README.md                # Esta documentação completa do projeto
+│   │   ├── api.js             # Funções de chamadas HTTP (Wallet, Inventory, Anti-Cheat, Orquestrador)
+│   │   └── game.js            # Lógica do jogo, telemetria e sintetizador matemático Web Audio
+│   └── index.html             # Esqueleto da página e modais (Loja, Placar, Terminal Maestro)
+├── buy_skin_workflow.yaml     # Definição do fluxo orquestrado da loja (Saga, Retries, Rollback)
+├── submit_score_workflow.yaml # Definição da Árvore de Decisão do Anti-Cheat e gravação
+├── Dockerfile                 # Instruções de montagem da imagem Docker (Cloud Run)
+├── .dockerignore              # Exclusão de arquivos desnecessários na imagem Docker
+├── .gitignore                 # Exclusão de arquivos de versionamento e venv
+└── README.md                  # Esta documentação completa do projeto
 ```
 
 ---
@@ -77,8 +87,8 @@ Siga os passos abaixo para preparar seu ambiente Python, instalar as dependênci
 Primeiro, clone o repositório para a sua máquina local e acesse a pasta do projeto:
 
 ```bash
-git clone https://github.com/Tiago-TSG/tetris-app-checkpoint-02.git
-cd tetris-app-checkpoint-02
+git clone https://github.com/Tiago-TSG/tetris-app-checkpoint-03.git
+cd tetris-app-checkpoint-03
 ```
 
 ### Passo 2: Criar o Ambiente Virtual (`venv`)
@@ -141,22 +151,22 @@ Este projeto possui suporte a contêineres Docker, o que permite rodar toda a ap
 Primeiro, clone o repositório para a sua máquina local e acesse a pasta do projeto:
 
 ```bash
-git clone https://github.com/Tiago-TSG/tetris-app-checkpoint-02.git
-cd tetris-app-checkpoint-02
+git clone https://github.com/Tiago-TSG/tetris-app-checkpoint-03.git
+cd tetris-app-checkpoint-03
 ```
 
 ### Passo 2: Construir a Imagem Docker
 No diretório raiz (onde está o arquivo `Dockerfile`), construa a imagem executando:
 
 ```bash
-docker build -t tetris-app-checkpoint-02 .
+docker build -t tetris-app-checkpoint-03 .
 ```
 
 ### Passo 3: Executar o Contêiner Localmente
 Inicialize o contêiner mapeando a porta interna `8080` para a porta `8080` do seu computador local:
 
 ```bash
-docker run -p 8080:8080 tetris-app-checkpoint-02
+docker run -p 8080:8080 tetris-app-checkpoint-03
 ```
 
 Acesse o jogo no navegador através do endereço local **`http://localhost:8080`**.
@@ -173,8 +183,8 @@ O **Google Cloud Run** é um serviço totalmente gerenciado do GCP que executa c
 3. Ter um projeto criado no GCP e habilitar o faturamento (Billing) e as APIs do Cloud Build e Cloud Run.
 4. Clonar este repositório Git em sua máquina local e acessar o diretório do projeto:
    ```bash
-   git clone https://github.com/Tiago-TSG/tetris-app-checkpoint-02.git
-   cd tetris-app-checkpoint-02
+   git clone https://github.com/Tiago-TSG/tetris-app-checkpoint-03.git
+   cd tetris-app-checkpoint-03
    ```
 
 ### 1. Criar os Tópicos do Pub/Sub
@@ -201,7 +211,7 @@ A forma mais rápida e simples de fazer o deploy no Cloud Run é usando o build 
 
 3.  Execute o comando de deploy. Ele criará a imagem e a colocará em execução:
     ```bash
-    gcloud run deploy tetris-app-checkpoint-02 \
+    gcloud run deploy tetris-app-checkpoint-03 \
       --source . \
       --region us-central1 \
       --allow-unauthenticated
@@ -211,7 +221,7 @@ A forma mais rápida e simples de fazer o deploy no Cloud Run é usando o build 
     
     *(Você pode alterar a região se desejar, como `southamerica-east1` para o Brasil).*
 
-4.  Ao final do processo, a CLI do gcloud exibirá a **URL pública do jogo** (ex: `https://tetris-app-checkpoint-02-xxxxx-us-central1.run.app`) no serviço "Cloud Run".
+4.  Ao final do processo, a CLI do gcloud exibirá a **URL pública do jogo** (ex: `https://tetris-app-checkpoint-03-xxxxx-us-central1.run.app`) no serviço "Cloud Run".
 
 ### 2. Configurar as Assinaturas de Push (Webhooks)
 Para fechar o ciclo do Pub/Sub, vincule os tópicos criados aos Webhooks da sua aplicação, substituindo a URL abaixo pela URL gerada no passo anterior:
@@ -248,13 +258,13 @@ Se você preferir construir a imagem manualmente e enviá-la para um repositóri
 2.  **Construir a imagem e enviá-la para o GCP via Cloud Build:**
     Substitua `PROJECT_ID` pelo ID real do seu projeto.
     ```bash
-    gcloud builds submit --tag us-central1-docker.pkg.dev/PROJECT_ID/neon-arcade-repo/tetris-app-checkpoint-02:latest .
+    gcloud builds submit --tag us-central1-docker.pkg.dev/PROJECT_ID/neon-arcade-repo/tetris-app-checkpoint-03:latest .
     ```
 
 3.  **Realizar o deploy do container armazenado no registro para o Cloud Run:**
     ```bash
     gcloud run deploy retro-neon-tetris \
-      --image us-central1-docker.pkg.dev/PROJECT_ID/neon-arcade-repo/tetris-app-checkpoint-02:latest \
+      --image us-central1-docker.pkg.dev/PROJECT_ID/neon-arcade-repo/tetris-app-checkpoint-03:latest \
       --region us-central1 \
       --allow-unauthenticated
     ```
