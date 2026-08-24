@@ -384,7 +384,7 @@ body {
 }
 
 .stat-val {
-    font-size: 1.15rem;
+    font-size: 1rem;
     font-weight: 700;
     color: var(--neon-green);
     text-shadow: 0 0 5px rgba(57, 255, 20, 0.5);
@@ -474,13 +474,16 @@ body {
 
 .floating-event {
     font-family: var(--font-mono);
-    font-size: 1.5rem;
+    font-size: 1.3rem; /* Reduced from 1.5rem to fit better */
     font-weight: bold;
     text-transform: uppercase;
     text-align: center;
     margin-bottom: 10px;
     animation: floatUpFade 2s ease-out forwards;
     text-shadow: 0 0 10px currentColor, 0 0 20px currentColor;
+    white-space: nowrap;
+    position: relative;
+    z-index: 105; /* Ensure it is above the canvas border */
 }
 
 .floating-event.tetris {
@@ -512,6 +515,26 @@ body {
 .scores-list .score-val {
     color: var(--neon-blue);
     font-weight: bold;
+}
+
+/* Floating Events de Bonificações */
+.floating-event.combo {
+    color: var(--neon-yellow);
+    font-size: 1.4rem; /* Reduced from 1.8rem */
+    animation: floatUpFade 2.2s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+.floating-event.b2b {
+    color: var(--neon-pink);
+    font-size: 1.8rem;
+    animation: floatUpFadeTetris 2.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+.floating-event.perfect {
+    color: var(--neon-green);
+    font-size: 2.2rem;
+    animation: floatUpFadeTetris 2.8s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+    text-shadow: 0 0 20px var(--neon-green), 0 0 40px var(--neon-green);
 }
 
 /* Modal de Game Over */
@@ -770,4 +793,219 @@ body {
 .achievement-badge-icon {
     font-size: 11px;
     cursor: help;
+}
+
+/* ============================================================================
+   ESTILOS ADICIONAIS DE ORQUESTRAÇÃO (LOJA & TERMINAL MAESTRO)
+   ============================================================================ */
+
+/* Terminal de logs do Maestro */
+.terminal {
+    background: #0d0e15;
+    border: 1.5px solid var(--neon-blue);
+    box-shadow: 0 0 10px rgba(0, 240, 255, 0.3);
+    border-radius: 4px;
+    padding: 10px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: #ffffff;
+    max-height: 120px;
+    overflow-y: auto;
+    text-align: left;
+    margin: 10px auto;
+    width: 90%;
+    box-sizing: border-box;
+}
+
+.terminal-header {
+    color: var(--neon-blue);
+    border-bottom: 1px solid rgba(0, 240, 255, 0.2);
+    padding-bottom: 4px;
+    margin-bottom: 6px;
+    text-transform: uppercase;
+    font-weight: bold;
+    letter-spacing: 1px;
+}
+
+.terminal-line {
+    margin-bottom: 4px;
+    line-height: 1.2;
+    animation: typing 0.1s steps(40, end);
+}
+
+.log-maestro { color: var(--neon-blue); text-shadow: 0 0 2px var(--neon-blue); }
+.log-wallet { color: var(--neon-yellow); text-shadow: 0 0 2px var(--neon-yellow); }
+.log-inventory { color: var(--neon-green); text-shadow: 0 0 2px var(--neon-green); }
+.log-anticheat { color: var(--neon-pink); text-shadow: 0 0 2px var(--neon-pink); }
+.log-error { color: var(--neon-red); text-shadow: 0 0 2px var(--neon-red); font-weight: bold; }
+
+/* Botão da loja e painéis */
+.store-section {
+    display: flex;
+    flex-direction: column;
+}
+
+#btn-open-store {
+    background: rgba(157, 78, 221, 0.1);
+    border: 1px solid var(--neon-pink);
+    color: var(--neon-pink);
+    text-shadow: 0 0 5px var(--neon-pink);
+    width: 100%;
+    box-sizing: border-box;
+    display: inline-flex;
+    justify-content: center;
+}
+
+#btn-open-store:hover {
+    background: var(--neon-pink);
+    color: #000;
+    box-shadow: 0 0 15px var(--neon-pink);
+}
+
+/* Modal da Loja */
+.store-modal-content {
+    max-width: 480px !important;
+    border-color: var(--neon-pink) !important;
+    box-shadow: 0 0 25px rgba(255, 49, 49, 0.4) !important;
+}
+
+.store-balance-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 8px;
+    background: rgba(255, 255, 0, 0.05);
+    border: 1px dashed var(--neon-yellow);
+    padding: 10px;
+    border-radius: 4px;
+    margin-bottom: 15px;
+    font-family: 'Orbitron', sans-serif;
+    font-size: 14px;
+}
+
+.store-balance-container strong {
+    font-size: 18px;
+    text-shadow: 0 0 8px var(--neon-yellow);
+}
+
+.store-catalog {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-height: 250px;
+    overflow-y: auto;
+    padding-right: 5px;
+}
+
+/* Card de item da loja */
+.skin-card {
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+    padding: 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    transition: all 0.2s ease;
+}
+
+.skin-card:hover {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: var(--neon-blue);
+}
+
+.skin-card.equipped {
+    border-color: var(--neon-green);
+    background: rgba(57, 255, 20, 0.03);
+}
+
+.skin-info {
+    text-align: left;
+    flex: 1;
+}
+
+.skin-name {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 12px;
+    font-weight: bold;
+    color: #ffffff;
+}
+
+.skin-desc {
+    font-size: 10px;
+    color: #88889f;
+    margin-top: 4px;
+    line-height: 1.2;
+}
+
+.skin-price {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 12px;
+    color: var(--neon-yellow);
+    text-shadow: 0 0 2px var(--neon-yellow);
+    display: flex;
+    align-items: center;
+    gap: 2px;
+}
+
+.skin-action {
+    min-width: 90px;
+}
+
+.skin-btn {
+    width: 100%;
+    padding: 6px 10px;
+    font-size: 10px;
+}
+
+.skin-btn.buy {
+    background: rgba(0, 240, 255, 0.1);
+    border-color: var(--neon-blue);
+    color: var(--neon-blue);
+}
+
+.skin-btn.buy:hover {
+    background: var(--neon-blue);
+    color: #000;
+}
+
+.skin-btn.equip {
+    background: rgba(57, 255, 20, 0.1);
+    border-color: var(--neon-green);
+    color: var(--neon-green);
+}
+
+.skin-btn.equip:hover {
+    background: var(--neon-green);
+    color: #000;
+}
+
+.skin-btn.active {
+    background: var(--neon-green);
+    color: #000;
+    border-color: var(--neon-green);
+    cursor: default;
+}
+
+/* Bot toggle simulation */
+.bot-simulation-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin: 10px auto;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 12px;
+}
+
+.bot-simulation-toggle input {
+    cursor: pointer;
+    width: 14px;
+    height: 14px;
+}
+
+.bot-simulation-toggle label {
+    cursor: pointer;
+    text-shadow: 0 0 2px var(--neon-red);
 }

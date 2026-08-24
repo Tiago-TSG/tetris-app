@@ -7,6 +7,19 @@ from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
+# Safely import firestore to avoid NameError when real client is disabled or missing
+class MockQuery:
+    DESCENDING = "DESCENDING"
+    ASCENDING = "ASCENDING"
+
+class MockFirestore:
+    Query = MockQuery
+
+try:
+    from google.cloud import firestore
+except Exception:
+    firestore = MockFirestore
+
 # Configuração de logs
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -46,40 +59,46 @@ DEFAULT_SCORES = [
 
 # Inicializa o Firestore de forma segura
 db = None
-try:
-    # Se houver um emulador rodando ou se estiver na nuvem (Cloud Run/GCP),
-    # o SDK do Google Cloud lida com as credenciais nativamente.
-    # Usamos None como padrão para que o SDK autodetecte o ID do projeto atual na nuvem.
-    from google.cloud import firestore
-    project_id = os.getenv("GOOGLE_CLOUD_PROJECT")
-    db = firestore.Client(project=project_id)
-    logger.info(f"Firestore client successfully initialized with project: {db.project}")
-except Exception as e:
-    logger.warning(f"Could not initialize Firestore Client: {e}. Falling back to local JSON storage.")
-    db = None
+if os.getenv("SCORES_FILE_PATH") == "test_scores.json":
+    logger.info("Test environment detected. Disabling real Firestore client for unit tests.")
+else:
+    try:
+        # Se houver um emulador rodando ou se estiver na nuvem (Cloud Run/GCP),
+        # o SDK do Google Cloud lida com as credenciais nativamente.
+        # Usamos None como padrão para que o SDK autodetecte o ID do projeto atual na nuvem.
+        from google.cloud import firestore
+        project_id = os.getenv("GOOGLE_CLOUD_PROJECT")
+        db = firestore.Client(project=project_id)
+        logger.info(f"Firestore client successfully initialized with project: {db.project}")
+    except Exception as e:
+        logger.warning(f"Could not initialize Firestore Client: {e}. Falling back to local JSON storage.")
+        db = None
 
 # Inicializa o Pub/Sub de forma segura (Publisher)
 publisher = None
 topic_path = None
 telemetry_topic_path = None
-try:
-    from google.cloud import pubsub_v1
-    pub_project_id = os.getenv("GOOGLE_CLOUD_PROJECT")
-    publisher = pubsub_v1.PublisherClient()
-    
-    # Se conseguirmos obter o projeto (seja da env ou resolvido pelo cliente)
-    if pub_project_id or getattr(publisher, "project", None):
-        resolved_project = pub_project_id or publisher.project
-        topic_path = publisher.topic_path(resolved_project, TOPIC_NAME)
-        telemetry_topic_path = publisher.topic_path(resolved_project, TELEMETRY_TOPIC_NAME)
-        logger.info(f"Pub/Sub Publisher client successfully initialized. Topic path: {topic_path}")
-        logger.info(f"Pub/Sub Telemetry Topic path initialized: {telemetry_topic_path}")
-    else:
-        logger.warning("Could not auto-detect GCP project for Pub/Sub. Falling back to direct database writes.")
+if os.getenv("SCORES_FILE_PATH") == "test_scores.json":
+    logger.info("Test environment detected. Disabling real Pub/Sub client for unit tests.")
+else:
+    try:
+        from google.cloud import pubsub_v1
+        pub_project_id = os.getenv("GOOGLE_CLOUD_PROJECT")
+        publisher = pubsub_v1.PublisherClient()
+        
+        # Se conseguirmos obter o projeto (seja da env ou resolvido pelo cliente)
+        if pub_project_id or getattr(publisher, "project", None):
+            resolved_project = pub_project_id or publisher.project
+            topic_path = publisher.topic_path(resolved_project, TOPIC_NAME)
+            telemetry_topic_path = publisher.topic_path(resolved_project, TELEMETRY_TOPIC_NAME)
+            logger.info(f"Pub/Sub Publisher client successfully initialized. Topic path: {topic_path}")
+            logger.info(f"Pub/Sub Telemetry Topic path initialized: {telemetry_topic_path}")
+        else:
+            logger.warning("Could not auto-detect GCP project for Pub/Sub. Falling back to direct database writes.")
+            publisher = None
+    except Exception as e:
+        logger.warning(f"Could not initialize Pub/Sub Publisher Client: {e}. Falling back to direct database writes.")
         publisher = None
-except Exception as e:
-    logger.warning(f"Could not initialize Pub/Sub Publisher Client: {e}. Falling back to direct database writes.")
-    publisher = None
 
 def load_scores_local() -> List[Dict[str, Any]]:
     if not os.path.exists(SCORES_FILE):
@@ -197,6 +216,307 @@ def calculate_badges(total_lines: int, total_tetris: int, max_level: int) -> Lis
         
     return badges
 
+# ============================================================================
+# MODERNIZAÇÃO: WALLET, INVENTORY, BANS & TRANSACTIONS STATE MANAGER
+# ============================================================================
+WALLETS_FILE = "wallets.json"
+INVENTORIES_FILE = "inventories.json"
+BANS_FILE = "bans.json"
+TRANSACTIONS_FILE = "transactions.json"
+
+SKINS_CATALOG = {
+    "classic": {"name": "Classic Neon", "price": 0, "description": "O tema clássico com luzes neon vibrantes."},
+    "pink_panther": {"name": "Pantera Cor de Rosa", "price": 100000, "description": "Visual retrô chic super elegante em tons rosa e magenta neon."},
+    "star_wars": {"name": "Star Wars: Force Neon", "price": 250000, "description": "Sabres de luz azul Jedi e vermelho Sith no espaço sideral."},
+    "harry_potter": {"name": "Harry Potter: Magic Neon", "price": 500000, "description": "Estilo místico baseado nas cores das quatro casas de Hogwarts."},
+    "lord_of_the_rings": {"name": "LOTR: Middle-earth", "price": 1000000, "description": "Ouro do Um Anel, verde élfico e as chamas da Montanha da Perdição."},
+    "gameboy": {"name": "Retro Gameboy", "price": 10000, "description": "Uma paleta de cores verde-oliva nostalgia pura."},
+    "cyberpunk": {"name": "Cyberpunk Sunset", "price": 20000, "description": "Mistura quente de rosa neon, roxo e laranja do deserto."},
+    "retro_future": {"name": "Neon Blue", "price": 30000, "description": "Eletrizante tema azul ciano e azul escuro."},
+    "corrupt_skin": {"name": "Corrupt Skin (Erro SAGA)", "price": 1000, "description": "Tema experimental que falha na entrega para testar SAGA."}
+}
+
+# --- WALLET PERSISTENCE ---
+def load_wallets_local() -> Dict[str, Any]:
+    if not os.path.exists(WALLETS_FILE):
+        return {}
+    try:
+        with open(WALLETS_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception as e:
+        logger.error(f"Error loading local wallets: {e}")
+        return {}
+
+def save_wallets_local(data: Dict[str, Any]) -> None:
+    try:
+        with open(WALLETS_FILE, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=4)
+    except Exception as e:
+        logger.error(f"Error saving local wallets: {e}")
+
+def get_wallet_balance(session_id: str) -> int:
+    session_id = session_id.upper()
+    if db is None:
+        wallets = load_wallets_local()
+        if session_id not in wallets:
+            wallets[session_id] = {"coins": 1000}
+            save_wallets_local(wallets)
+            return 1000
+        return wallets[session_id].get("coins", 1000)
+    try:
+        doc = db.collection("wallets").document(session_id).get()
+        if doc.exists:
+            return doc.to_dict().get("coins", 1000)
+        db.collection("wallets").document(session_id).set({"coins": 1000})
+        return 1000
+    except Exception as e:
+        logger.error(f"Error getting wallet balance: {e}")
+        return 1000
+
+def update_wallet_balance(session_id: str, amount: int) -> bool:
+    session_id = session_id.upper()
+    if db is None:
+        wallets = load_wallets_local()
+        user_wallet = wallets.get(session_id, {"coins": 1000})
+        new_balance = user_wallet["coins"] + amount
+        if new_balance < 0:
+            return False
+        user_wallet["coins"] = new_balance
+        wallets[session_id] = user_wallet
+        save_wallets_local(wallets)
+        return True
+    try:
+        doc_ref = db.collection("wallets").document(session_id)
+        doc = doc_ref.get()
+        current_balance = doc.to_dict().get("coins", 1000) if doc.exists else 1000
+        new_balance = current_balance + amount
+        if new_balance < 0:
+            return False
+        doc_ref.set({"coins": new_balance})
+        return True
+    except Exception as e:
+        logger.error(f"Error updating wallet: {e}")
+        return False
+
+# --- INVENTORY PERSISTENCE ---
+def load_inventories_local() -> Dict[str, Any]:
+    if not os.path.exists(INVENTORIES_FILE):
+        return {}
+    try:
+        with open(INVENTORIES_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception as e:
+        logger.error(f"Error loading local inventories: {e}")
+        return {}
+
+def save_inventories_local(data: Dict[str, Any]) -> None:
+    try:
+        with open(INVENTORIES_FILE, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=4)
+    except Exception as e:
+        logger.error(f"Error saving local inventories: {e}")
+
+def get_unlocked_skins(session_id: str) -> List[str]:
+    session_id = session_id.upper()
+    if db is None:
+        inv = load_inventories_local()
+        if session_id not in inv:
+            inv[session_id] = {"skins": ["classic"], "active_skin": "classic"}
+            save_inventories_local(inv)
+            return ["classic"]
+        return inv[session_id].get("skins", ["classic"])
+    try:
+        doc = db.collection("inventories").document(session_id).get()
+        if doc.exists:
+            return doc.to_dict().get("skins", ["classic"])
+        db.collection("inventories").document(session_id).set({"skins": ["classic"], "active_skin": "classic"})
+        return ["classic"]
+    except Exception as e:
+        logger.error(f"Error getting inventory: {e}")
+        return ["classic"]
+
+def unlock_skin(session_id: str, skin_id: str) -> bool:
+    session_id = session_id.upper()
+    if skin_id == "corrupt_skin":
+        logger.warning(f"Simulating DB error on Inventory Service for corrupt_skin")
+        return False
+    if db is None:
+        inv = load_inventories_local()
+        user_inv = inv.get(session_id, {"skins": ["classic"], "active_skin": "classic"})
+        if skin_id not in user_inv["skins"]:
+            user_inv["skins"].append(skin_id)
+        inv[session_id] = user_inv
+        save_inventories_local(inv)
+        return True
+    try:
+        doc_ref = db.collection("inventories").document(session_id)
+        doc = doc_ref.get()
+        if doc.exists:
+            user_inv = doc.to_dict()
+            skins = user_inv.get("skins", ["classic"])
+            if skin_id not in skins:
+                skins.append(skin_id)
+            user_inv["skins"] = skins
+        else:
+            user_inv = {"skins": ["classic", skin_id], "active_skin": "classic"}
+        doc_ref.set(user_inv)
+        return True
+    except Exception as e:
+        logger.error(f"Error unlocking skin: {e}")
+        return False
+
+def get_active_skin(session_id: str) -> str:
+    session_id = session_id.upper()
+    if db is None:
+        inv = load_inventories_local()
+        return inv.get(session_id, {}).get("active_skin", "classic")
+    try:
+        doc = db.collection("inventories").document(session_id).get()
+        if doc.exists:
+            return doc.to_dict().get("active_skin", "classic")
+        return "classic"
+    except Exception as e:
+        logger.error(f"Error getting active skin: {e}")
+        return "classic"
+
+def set_active_skin(session_id: str, skin_id: str) -> bool:
+    session_id = session_id.upper()
+    unlocked = get_unlocked_skins(session_id)
+    if skin_id not in unlocked:
+        return False
+    if db is None:
+        inv = load_inventories_local()
+        user_inv = inv.get(session_id, {"skins": ["classic"], "active_skin": "classic"})
+        user_inv["active_skin"] = skin_id
+        inv[session_id] = user_inv
+        save_inventories_local(inv)
+        return True
+    try:
+        doc_ref = db.collection("inventories").document(session_id)
+        doc_ref.update({"active_skin": skin_id})
+        return True
+    except Exception as e:
+        logger.error(f"Error setting active skin: {e}")
+        return False
+
+# --- BAN SERVICE PERSISTENCE ---
+def load_bans_local() -> List[str]:
+    if not os.path.exists(BANS_FILE):
+        return []
+    try:
+        with open(BANS_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception as e:
+        logger.error(f"Error loading local bans: {e}")
+        return []
+
+def save_bans_local(data: List[str]) -> None:
+    try:
+        with open(BANS_FILE, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=4)
+    except Exception as e:
+        logger.error(f"Error saving local bans: {e}")
+
+def is_session_banned(session_id: str) -> bool:
+    session_id = session_id.upper()
+    if db is None:
+        bans = load_bans_local()
+        return session_id in bans
+    try:
+        doc = db.collection("bans").document(session_id).get()
+        return doc.exists
+    except Exception as e:
+        logger.error(f"Error checking ban status: {e}")
+        return False
+
+def ban_session(session_id: str) -> None:
+    session_id = session_id.upper()
+    if db is None:
+        bans = load_bans_local()
+        if session_id not in bans:
+            bans.append(session_id)
+            save_bans_local(bans)
+        return
+    try:
+        from google.cloud import firestore
+        db.collection("bans").document(session_id).set({"banned_at": firestore.SERVER_TIMESTAMP})
+        logger.info(f"Session {session_id} successfully banned in Firestore.")
+    except Exception as e:
+        logger.error(f"Error banning session: {e}")
+
+# --- IDEMPOTENCY KEY TRANSACTIONS PERSISTENCE ---
+def load_transactions_local() -> Dict[str, Any]:
+    if not os.path.exists(TRANSACTIONS_FILE):
+        return {}
+    try:
+        with open(TRANSACTIONS_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception as e:
+        logger.error(f"Error loading local transactions: {e}")
+        return {}
+
+def save_transactions_local(data: Dict[str, Any]) -> None:
+    try:
+        with open(TRANSACTIONS_FILE, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=4)
+    except Exception as e:
+        logger.error(f"Error saving local transactions: {e}")
+
+def is_transaction_processed(transaction_id: str) -> bool:
+    if not transaction_id:
+        return False
+    if db is None:
+        txs = load_transactions_local()
+        return transaction_id in txs
+    try:
+        doc = db.collection("transactions").document(transaction_id).get()
+        return doc.exists
+    except Exception as e:
+        logger.error(f"Error checking transaction status: {e}")
+        return False
+
+def record_transaction(transaction_id: str, payload: Dict[str, Any]) -> None:
+    if not transaction_id:
+        return
+    if db is None:
+        txs = load_transactions_local()
+        txs[transaction_id] = {**payload, "timestamp": os.getpid()}
+        save_transactions_local(txs)
+        return
+    try:
+        from google.cloud import firestore
+        payload["timestamp"] = firestore.SERVER_TIMESTAMP
+        db.collection("transactions").document(transaction_id).set(payload)
+    except Exception as e:
+        logger.error(f"Error recording transaction: {e}")
+
+# --- AI ML DETECTOR HEURISTIC ---
+def analyze_keystrokes_with_ml(keystrokes: List[Dict[str, Any]]) -> str:
+    """
+    Classificador Heurístico simulando IA/ML.
+    Mede desvio padrão das cadências para detectar cliques robóticos ou falta de telemetria.
+    """
+    if not keystrokes or len(keystrokes) < 5:
+        return "Robot"
+    intervals = []
+    for i in range(1, len(keystrokes)):
+        dt = keystrokes[i]["t"] - keystrokes[i-1]["t"]
+        intervals.append(dt)
+    unique_intervals = set(intervals)
+    if len(unique_intervals) == 1:
+        return "Robot"
+    avg = sum(intervals) / len(intervals)
+    variance = sum((x - avg) ** 2 for x in intervals) / len(intervals)
+    std_dev = variance ** 0.5
+    # Humanos têm alta variabilidade no ritmo das teclas (> 8ms de desvio padrão)
+    if std_dev < 8.0:
+        return "Robot"
+    # Humano normal não digita a mais de 25 teclas por segundo de média sustentada
+    if avg < 40.0:
+        return "Robot"
+    return "Human"
+
+# --- TELEMETRY PROCESSING REWARDS INTEGRATION ---
 def process_telemetry_event(event: Dict[str, Any]) -> Dict[str, Any]:
     session_id = event["session_id"].upper()
     event_type = event["event_type"]
@@ -214,10 +534,13 @@ def process_telemetry_event(event: Dict[str, Any]) -> Dict[str, Any]:
         
         if event_type == "line_clear":
             user_data["total_lines_cleared"] += value
+            update_wallet_balance(session_id, value * 100)
         elif event_type == "level_up":
             user_data["max_level_reached"] = max(user_data["max_level_reached"], value)
+            update_wallet_balance(session_id, 500)
         elif event_type == "tetris_clear":
             user_data["tetris_count"] += value
+            update_wallet_balance(session_id, value * 1000)
             
         user_data["badges"] = calculate_badges(
             user_data["total_lines_cleared"],
@@ -246,10 +569,13 @@ def process_telemetry_event(event: Dict[str, Any]) -> Dict[str, Any]:
             
         if event_type == "line_clear":
             user_data["total_lines_cleared"] += value
+            update_wallet_balance(session_id, value * 100)
         elif event_type == "level_up":
             user_data["max_level_reached"] = max(user_data["max_level_reached"], value)
+            update_wallet_balance(session_id, 500)
         elif event_type == "tetris_clear":
             user_data["tetris_count"] += value
+            update_wallet_balance(session_id, value * 1000)
             
         user_data["badges"] = calculate_badges(
             user_data["total_lines_cleared"],
@@ -432,6 +758,366 @@ def get_achievements(session_id: str):
     except Exception as e:
         logger.error(f"Error fetching achievements: {e}")
         return {"badges": []}
+
+# ============================================================================
+# MODERNIZAÇÃO: MODELOS DE DADOS PARA MICROSERVIÇOS ATÔMICOS
+# ============================================================================
+class WalletDebitRequest(BaseModel):
+    session_id: str
+    amount: int
+    transaction_id: str
+
+class WalletCreditRequest(BaseModel):
+    session_id: str
+    amount: int
+    transaction_id: str
+
+class InventoryUnlockRequest(BaseModel):
+    session_id: str
+    skin_id: str
+    transaction_id: str
+
+class AccountBanRequest(BaseModel):
+    session_id: str
+
+class AntiCheatRequest(BaseModel):
+    keystrokes: List[Dict[str, Any]] = Field(default=[])
+    is_bot_simulated: bool = False
+
+class BuySkinOrchestratedRequest(BaseModel):
+    session_id: str
+    skin_id: str
+
+class ScoreOrchestratedRequest(BaseModel):
+    name: str = Field(..., min_length=1, max_length=15)
+    score: int = Field(..., ge=0)
+    level: int = Field(..., ge=1)
+    lines: int = Field(..., ge=0)
+    session_id: str
+    keystrokes: List[Dict[str, Any]] = Field(default=[])
+    is_bot_simulated: bool = False
+
+# ============================================================================
+# MODERNIZAÇÃO: MICROSERVIÇOS INDIVIDUAIS (APIS ATÔMICAS PARA WORKFLOWS)
+# ============================================================================
+
+@app.get("/api/wallet/{session_id}")
+def api_get_wallet(session_id: str):
+    """Retorna o saldo da carteira do usuário."""
+    if is_session_banned(session_id):
+        raise HTTPException(status_code=403, detail="Sessão permanentemente banida por bots.")
+    balance = get_wallet_balance(session_id)
+    return {"session_id": session_id, "coins": balance}
+
+@app.post("/api/wallet/debit")
+def api_wallet_debit(req: WalletDebitRequest):
+    """Efetua um débito de moedas (Atômico & Idempotente)."""
+    session_id = req.session_id.upper()
+    tx_id = f"debit:{req.transaction_id}"
+    
+    if is_session_banned(session_id):
+        raise HTTPException(status_code=403, detail="Sessão banida.")
+        
+    # Idempotência: Se já processada, apenas retorna sucesso
+    if is_transaction_processed(tx_id):
+        return {
+            "status": "success",
+            "message": "Idempotent: Débito já processado anteriormente.",
+            "coins": get_wallet_balance(session_id)
+        }
+        
+    # Executa a regra de negócio
+    success = update_wallet_balance(session_id, -abs(req.amount))
+    if not success:
+        raise HTTPException(status_code=402, detail="Saldo insuficiente na carteira.")
+        
+    # Grava transação
+    record_transaction(tx_id, {
+        "type": "debit",
+        "session_id": session_id,
+        "amount": req.amount
+    })
+    
+    return {
+        "status": "success",
+        "coins": get_wallet_balance(session_id)
+    }
+
+@app.post("/api/wallet/credit")
+def api_wallet_credit(req: WalletCreditRequest):
+    """Efetua um crédito/reembolso de moedas (Atômico & Idempotente)."""
+    session_id = req.session_id.upper()
+    tx_id = f"credit:{req.transaction_id}"
+    
+    if is_transaction_processed(tx_id):
+        return {
+            "status": "success",
+            "message": "Idempotent: Crédito já processado anteriormente.",
+            "coins": get_wallet_balance(session_id)
+        }
+        
+    # Executa crédito
+    update_wallet_balance(session_id, abs(req.amount))
+    
+    # Grava transação
+    record_transaction(tx_id, {
+        "type": "credit",
+        "session_id": session_id,
+        "amount": req.amount
+    })
+    
+    return {
+        "status": "success",
+        "coins": get_wallet_balance(session_id)
+    }
+
+@app.get("/api/inventory/{session_id}")
+def api_get_inventory(session_id: str):
+    """Consulta as skins desbloqueadas e o tema ativo do usuário."""
+    if is_session_banned(session_id):
+        raise HTTPException(status_code=403, detail="Sessão banida.")
+    unlocked = get_unlocked_skins(session_id)
+    active = get_active_skin(session_id)
+    return {"skins": unlocked, "active_skin": active}
+
+@app.post("/api/inventory/unlock")
+def api_inventory_unlock(req: InventoryUnlockRequest):
+    """Desbloqueia uma skin no inventário do usuário (Atômico & Idempotente)."""
+    session_id = req.session_id.upper()
+    tx_id = f"unlock:{req.transaction_id}"
+    
+    if is_session_banned(session_id):
+        raise HTTPException(status_code=403, detail="Sessão banida.")
+        
+    if is_transaction_processed(tx_id):
+        return {"status": "success", "message": "Idempotent: Desbloqueio já efetuado."}
+        
+    success = unlock_skin(session_id, req.skin_id)
+    if not success:
+        # Se falhar (ex: corrupt_skin), retorna 500 para acionar compensação no orquestrador
+        raise HTTPException(status_code=500, detail="Erro interno ao liberar skin no banco de dados.")
+        
+    record_transaction(tx_id, {
+        "type": "unlock",
+        "session_id": session_id,
+        "skin_id": req.skin_id
+    })
+    
+    return {"status": "success", "unlocked": True}
+
+@app.post("/api/inventory/select")
+def api_inventory_select(req: BuySkinOrchestratedRequest):
+    """Seleciona a skin ativa para o jogo."""
+    session_id = req.session_id.upper()
+    if is_session_banned(session_id):
+        raise HTTPException(status_code=403, detail="Sessão banida.")
+    success = set_active_skin(session_id, req.skin_id)
+    if not success:
+        raise HTTPException(status_code=400, detail="Skin não desbloqueada ou inválida.")
+    return {"status": "success", "active_skin": req.skin_id}
+
+@app.post("/api/accounts/ban")
+def api_accounts_ban(req: AccountBanRequest):
+    """Bane uma conta/sessão permanentemente."""
+    session_id = req.session_id.upper()
+    ban_session(session_id)
+    return {"status": "success", "message": f"Sessão {session_id} banida por uso de bots."}
+
+@app.post("/api/anti-cheat/analyze")
+def api_anti_cheat_analyze(req: AntiCheatRequest):
+    """Executa o motor de análise de digitação com IA."""
+    if req.is_bot_simulated:
+        return {"result": "Robot"}
+    classification = analyze_keystrokes_with_ml(req.keystrokes)
+    return {"result": classification}
+
+# ============================================================================
+# MODERNIZAÇÃO: LOCAL MAESTROS (SIMULADORES DO GOOGLE CLOUD WORKFLOWS)
+# ============================================================================
+
+@app.get("/api/store/catalog/{session_id}")
+def api_store_catalog(session_id: str):
+    """Helper para consolidar catálogo, moedas e estado das skins no frontend."""
+    session_id = session_id.upper()
+    if is_session_banned(session_id):
+        raise HTTPException(status_code=403, detail="Sessão banida.")
+    unlocked = get_unlocked_skins(session_id)
+    active = get_active_skin(session_id)
+    balance = get_wallet_balance(session_id)
+    
+    catalog_list = []
+    for skin_id, details in SKINS_CATALOG.items():
+        catalog_list.append({
+            "skin_id": skin_id,
+            "name": details["name"],
+            "price": details["price"],
+            "description": details["description"],
+            "is_unlocked": skin_id in unlocked,
+            "is_active": skin_id == active
+        })
+        
+    # Ordenar o catálogo do mais barato para o mais caro
+    catalog_list.sort(key=lambda x: x["price"])
+        
+    return {
+        "catalog": catalog_list,
+        "balance": balance,
+        "active_skin": active
+    }
+
+@app.post("/api/orchestrate/buy-skin")
+def orchestrator_buy_skin(req: BuySkinOrchestratedRequest):
+    """
+    SIMULADOR LOCAL DO GCP WORKFLOWS (SAGA DESIGN PATTERN).
+    Orquestra a compra da skin chamando as APIs atômicas com retries e compensação.
+    """
+    session_id = req.session_id.upper()
+    skin_id = req.skin_id
+    transaction_id = f"TX-BUY-{session_id}-{skin_id}"
+    
+    logs = []
+    logs.append(f"[Workflows] Iniciando fluxo 'buy_skin_workflow' para a sessão {session_id}")
+    
+    # Validações iniciais (Catálogo)
+    if skin_id not in SKINS_CATALOG:
+        logs.append(f"[Workflows] Erro: Skin '{skin_id}' não cadastrada no Catálogo.")
+        raise HTTPException(status_code=400, detail={"message": "Skin inválida", "logs": logs})
+        
+    details = SKINS_CATALOG[skin_id]
+    price = details["price"]
+    unlocked = get_unlocked_skins(session_id)
+    
+    if skin_id in unlocked:
+        logs.append(f"[Workflows] Erro: Usuário já possui a skin '{skin_id}'.")
+        raise HTTPException(status_code=400, detail={"message": "Skin já adquirida", "logs": logs})
+        
+    # --- STEP 1: DEBITAR CARTEIRA ---
+    logs.append(f"[Workflows] Executando chamada HTTP POST -> /api/wallet/debit (Preço: {price})")
+    
+    # Simulação de Retry do Workflow (Exemplo meramente visual de resiliência de rede)
+    logs.append("[Workflows] (Tentativa 1/5) Conectando ao Wallet Service...")
+    
+    debit_payload = WalletDebitRequest(session_id=session_id, amount=price, transaction_id=transaction_id)
+    try:
+        debit_res = api_wallet_debit(debit_payload)
+        logs.append(f"[WalletService] Débito efetuado com sucesso! Saldo atualizado.")
+    except HTTPException as e:
+        logs.append(f"[WalletService] ERRO: Débito rejeitado (Código: {e.status_code}, Detalhe: {e.detail})")
+        logs.append("[Workflows] Fluxo abortado antes de alterar inventário.")
+        raise HTTPException(status_code=e.status_code, detail={"message": e.detail, "logs": logs})
+        
+    # --- STEP 2: ATIVAR INVENTÁRIO ---
+    logs.append(f"[Workflows] Executando chamada HTTP POST -> /api/inventory/unlock (Skin: '{skin_id}')")
+    logs.append("[Workflows] (Tentativa 1/5) Conectando ao Inventory Service...")
+    
+    unlock_payload = InventoryUnlockRequest(session_id=session_id, skin_id=skin_id, transaction_id=transaction_id)
+    try:
+        unlock_res = api_inventory_unlock(unlock_payload)
+        logs.append(f"[InventoryService] Skin '{skin_id}' adicionada ao inventário do jogador!")
+    except HTTPException as e:
+        logs.append(f"[InventoryService] ERRO CRÍTICO: Falha ao desbloquear skin no banco (Código: {e.status_code})")
+        
+        # --- TRANSAÇÃO COMPENSATÓRIA (SAGA ROLLBACK) ---
+        logs.append("[Workflows] Falha detectada no passo 2! Iniciando rollback da transação (SAGA Compensatória)...")
+        logs.append(f"[Workflows] Executando compensação HTTP POST -> /api/wallet/credit (Reembolso: {price})")
+        
+        try:
+            credit_payload = WalletCreditRequest(session_id=session_id, amount=price, transaction_id=transaction_id + "-COMPENSATE")
+            api_wallet_credit(credit_payload)
+            logs.append(f"[WalletService] Reembolso de {price} moedas creditado com sucesso!")
+            logs.append("[Workflows] SAGA compensação executada. Dinheiro devolvido. Transação desfeita de forma consistente.")
+        except Exception as err:
+            # DLQ (Dead Letter Queue) caso o rollback também falhe!
+            logs.append(f"[WalletService] ERRO CRÍTICO COMPLEMENTAR: Falha catastrófica ao reembolsar jogador!")
+            logs.append(f"[Workflows] !!! REDIRECIONANDO ERRO PARA SAGA-DLQ (Dead Letter Queue do Pub/Sub) !!!")
+            logs.append(f"[Workflows] ID de rastreamento salvo na DLQ: {transaction_id}-DLQ-ERROR")
+            return {
+                "status": "dlq_error",
+                "message": "Erro gravíssimo! A transação de compensação falhou e o incidente foi salvo na DLQ.",
+                "logs": logs
+            }
+            
+        return {
+            "status": "rolled_back",
+            "message": "Falha no serviço de inventário. A compra foi abortada e o saldo foi compensado (reembolsado)!",
+            "logs": logs
+        }
+        
+    logs.append("[Workflows] Fluxo 'buy_skin_workflow' executado com 100% de sucesso!")
+    return {
+        "status": "success",
+        "message": "Skin desbloqueada e comprada!",
+        "logs": logs,
+        "new_balance": get_wallet_balance(session_id)
+    }
+
+@app.post("/api/orchestrate/submit-score")
+def orchestrator_submit_score(req: ScoreOrchestratedRequest):
+    """
+    SIMULADOR LOCAL DO GCP WORKFLOWS (DECISION TREE).
+    Orquestra a triagem do placar via Anti-Cheat com IA, banimento ou gravação com moedas.
+    """
+    session_id = req.session_id.upper()
+    logs = []
+    
+    logs.append(f"[Workflows] Iniciando fluxo 'submit_score_workflow' para o jogador '{req.name}'")
+    
+    # --- STEP 1: CONSULTAR BANIMENTO ---
+    logs.append("[Workflows] Executando consulta HTTP GET -> /api/accounts/status")
+    if is_session_banned(session_id):
+        logs.append(f"[AccountService] REJEITADO: A sessão '{session_id}' foi identificada como BANIDA por fraude.")
+        logs.append("[Workflows] Bloqueando fluxo. Scoreboard ignorado.")
+        raise HTTPException(status_code=403, detail={"message": "Usuário banido permanentemente.", "logs": logs})
+        
+    # --- STEP 2: CLASSIFICAÇÃO DE IA ANTI-CHEAT ---
+    logs.append(f"[Workflows] Executando chamada HTTP POST -> /api/anti-cheat/analyze ({len(req.keystrokes)} teclas coletadas)")
+    
+    cheat_req = AntiCheatRequest(keystrokes=req.keystrokes, is_bot_simulated=req.is_bot_simulated)
+    cheat_res = api_anti_cheat_analyze(cheat_req)
+    classification = cheat_res["result"]
+    
+    logs.append(f"[AntiCheatService] IA classificou o estilo de jogo como: '{classification.upper()}'")
+    
+    # --- STEP 3: CONDICIONAL (DECISION TREE) ---
+    if classification == "Robot":
+        logs.append("[Workflows] Decisão: ROTA BOT (Rígida). Acionando banimento de conta.")
+        logs.append(f"[Workflows] Executando chamada HTTP POST -> /api/accounts/ban")
+        
+        ban_payload = AccountBanRequest(session_id=session_id)
+        api_accounts_ban(ban_payload)
+        
+        logs.append("[Workflows] Placar de trapaça descartado. Conta banida da infraestrutura.")
+        return {
+            "status": "banned",
+            "message": "Uso de Auto-Bot/Cheat detectado pela IA! Sua sessão foi banida permanentemente.",
+            "logs": logs
+        }
+    else:
+        logs.append("[Workflows] Decisão: ROTA HUMANA (Segura). Salvando score na coreografia legada.")
+        logs.append("[Workflows] Executando chamada HTTP POST -> /api/scores/publish (Score: " + str(req.score) + ")")
+        
+        score_entry = {
+            "name": req.name.upper(),
+            "score": req.score,
+            "level": req.level,
+            "lines": req.lines,
+            "session_id": session_id
+        }
+        # Dispara no Pub/Sub legado sem alterar o comportamento existente
+        publish_score_to_pubsub(score_entry)
+        
+        # --- RECOMPENSA DE MOEDAS ---
+        # 100% do score vira moedas na carteira do jogador!
+        coins_reward = max(1, int(req.score))
+        logs.append(f"[Workflows] Gerando recompensa de score: {coins_reward} moedas adicionadas à carteira.")
+        update_wallet_balance(session_id, coins_reward)
+        
+        logs.append("[Workflows] Fluxo 'submit_score_workflow' finalizado com sucesso!")
+        return {
+            "status": "success",
+            "message": "Partida humana validada! Pontuação gravada e moedas creditadas.",
+            "logs": logs
+        }
 
 @app.post("/api/internal/telemetry-worker")
 def telemetry_pubsub_push_receiver(payload: PubSubPushPayload):

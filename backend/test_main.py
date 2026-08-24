@@ -11,24 +11,28 @@ import backend.main as main
 
 class TestTetrisBackend(unittest.TestCase):
     def setUp(self):
-        # Limpar arquivo de teste local se existir
-        if os.path.exists("test_scores.json"):
-            try:
-                os.remove("test_scores.json")
-            except OSError:
-                pass
+        # Limpar arquivos de teste locais se existirem
+        files_to_remove = ["test_scores.json", "wallets.json", "inventories.json", "bans.json", "transactions.json"]
+        for f in files_to_remove:
+            if os.path.exists(f):
+                try:
+                    os.remove(f)
+                except OSError:
+                    pass
         # Resetar mocks globais do módulo
         main.db = None
         main.publisher = None
         main.topic_path = None
 
     def tearDown(self):
-        # Limpar arquivo de teste local se existir
-        if os.path.exists("test_scores.json"):
-            try:
-                os.remove("test_scores.json")
-            except OSError:
-                pass
+        # Limpar arquivos de teste locais se existirem
+        files_to_remove = ["test_scores.json", "wallets.json", "inventories.json", "bans.json", "transactions.json"]
+        for f in files_to_remove:
+            if os.path.exists(f):
+                try:
+                    os.remove(f)
+                except OSError:
+                    pass
 
     def test_local_fallback_load_default(self):
         """Testa se carrega os scores padrão se o arquivo não existir."""
@@ -132,6 +136,138 @@ class TestTetrisBackend(unittest.TestCase):
         self.assertEqual(response["status"], "success")
         # Garante que o método add() do Firestore foi chamado com o score decodificado
         mock_col.add.assert_called_once_with(score_data)
+
+    # --- NOVO: TESTES DA ARQUITETURA ORQUESTRADA ---
+
+    def test_wallet_idempotency(self):
+        """Testa se as operações de débito e crédito na carteira respeitam as chaves de idempotência."""
+        session_id = "TEST_IDEMPOTENCY"
+        
+        # Saldo inicial é 1000
+        balance = main.get_wallet_balance(session_id)
+        self.assertEqual(balance, 1000)
+        
+        # Primeiro débito: Sucesso
+        debit_req = main.WalletDebitRequest(session_id=session_id, amount=200, transaction_id="TX-123")
+        res1 = main.api_wallet_debit(debit_req)
+        self.assertEqual(res1["status"], "success")
+        self.assertEqual(res1["coins"], 800)
+        
+        # Segundo débito idêntico (idempotente): Deve retornar o mesmo saldo de 800 sem cobrar de novo
+        res2 = main.api_wallet_debit(debit_req)
+        self.assertEqual(res2["coins"], 800)
+        self.assertTrue("Idempotent" in res2["message"])
+        
+        # Primeiro reembolso (crédito): Sucesso
+        credit_req = main.WalletCreditRequest(session_id=session_id, amount=200, transaction_id="TX-123-COMP")
+        res3 = main.api_wallet_credit(credit_req)
+        self.assertEqual(res3["coins"], 1000)
+        
+        # Segundo crédito idêntico (idempotente): Deve ignorar sem adicionar moedas extras
+        res4 = main.api_wallet_credit(credit_req)
+        self.assertEqual(res4["coins"], 1000)
+
+    def test_saga_buy_skin_success(self):
+        """Testa a orquestração bem-sucedida de compra de skin."""
+        session_id = "TEST_SAGA_OK"
+        # Inicializa carteira com saldo suficiente de 10000 moedas (gameboy custa 5000)
+        main.update_wallet_balance(session_id, 9000) # 1000 + 9000 = 10000
+        
+        req = main.BuySkinOrchestratedRequest(session_id=session_id, skin_id="gameboy")
+        res = main.orchestrator_buy_skin(req)
+        
+        self.assertEqual(res["status"], "success")
+        self.assertEqual(res["new_balance"], 5000) # De 10000 cobrou 5000
+        
+        # Verifica se o inventário tem a skin
+        skins = main.get_unlocked_skins(session_id)
+        self.assertIn("gameboy", skins)
+
+    def test_saga_buy_skin_compensatory_rollback(self):
+        """Testa a transação compensatória (SAGA rollback) quando a entrega de skin falha."""
+        session_id = "TEST_SAGA_FAIL"
+        # Inicializa carteira com saldo suficiente de 1000 moedas (corrupt_skin custa 1000)
+        main.update_wallet_balance(session_id, 0) # Força saldo 1000
+        
+        # corrupt_skin força erro no serviço de inventário
+        req = main.BuySkinOrchestratedRequest(session_id=session_id, skin_id="corrupt_skin")
+        res = main.orchestrator_buy_skin(req)
+        
+        # O Maestro detecta o erro e reembolsa
+        self.assertEqual(res["status"], "rolled_back")
+        self.assertIn("compra foi abortada e o saldo foi compensado", res["message"])
+        
+        # Garante que o saldo do jogador foi restaurado para 1000 moedas
+        balance = main.get_wallet_balance(session_id)
+        self.assertEqual(balance, 1000)
+        
+        # Garante que a skin NÃO foi liberada
+        skins = main.get_unlocked_skins(session_id)
+        self.assertNotIn("corrupt_skin", skins)
+
+    def test_orchestrate_submit_score_human(self):
+        """Testa se a orquestração de placar valida partidas humanas e as envia para gravação."""
+        session_id = "TEST_HUMAN"
+        
+        # Mock de keystrokes humanos (tempo variável)
+        keystrokes = [
+            {"key": "ArrowLeft", "t": 100.0},
+            {"key": "ArrowUp", "t": 250.0},
+            {"key": "ArrowRight", "t": 480.0},
+            {"key": "ArrowDown", "t": 690.0},
+            {"key": "Space", "t": 950.0}
+        ]
+        
+        req = main.ScoreOrchestratedRequest(
+            name="HUMAN_PRO",
+            score=5000,
+            level=3,
+            lines=15,
+            session_id=session_id,
+            keystrokes=keystrokes
+        )
+        
+        res = main.orchestrator_submit_score(req)
+        self.assertEqual(res["status"], "success")
+        self.assertIn("Partida humana validada", res["message"])
+        
+        # Verifica se ganhou moedas de recompensa (5000 / 10 = 500 moedas)
+        balance = main.get_wallet_balance(session_id)
+        self.assertEqual(balance, 1500) # 1000 inicial + 500 recompensa
+
+    def test_orchestrate_submit_score_robot_bans(self):
+        """Testa se a orquestração detecta bot, bloqueia salvamento e bane a sessão."""
+        session_id = "TEST_ROBOT"
+        
+        # Mock de keystrokes robóticos (perfeitamente espaçados de 50ms)
+        keystrokes = [
+            {"key": "ArrowLeft", "t": 50.0},
+            {"key": "ArrowLeft", "t": 100.0},
+            {"key": "ArrowLeft", "t": 150.0},
+            {"key": "ArrowLeft", "t": 200.0},
+            {"key": "ArrowLeft", "t": 250.0}
+        ]
+        
+        req = main.ScoreOrchestratedRequest(
+            name="BOT_CHEAT",
+            score=900000,
+            level=20,
+            lines=200,
+            session_id=session_id,
+            keystrokes=keystrokes
+        )
+        
+        res = main.orchestrator_submit_score(req)
+        self.assertEqual(res["status"], "banned")
+        self.assertIn("Uso de Auto-Bot/Cheat detectado", res["message"])
+        
+        # Verifica se a sessão foi incluída no Ban Service
+        self.assertTrue(main.is_session_banned(session_id))
+        
+        # Tenta enviar de novo após banido: Deve ser barrado imediatamente
+        with self.assertRaises(main.HTTPException) as context:
+            main.orchestrator_submit_score(req)
+        self.assertEqual(context.exception.status_code, 403)
 
 if __name__ == "__main__":
     unittest.main()

@@ -15,30 +15,152 @@ class SoundManager {
         
         // Sequência de notas da melodia clássica do Tetris (Korobeiniki) em A menor
         // Formato: [nota, duração em ms] - 0 representa pausa
-        this.melody = [
-            ['E5', 400], ['B4', 200], ['C5', 200], ['D5', 400], ['C5', 200], ['B4', 200],
-            ['A4', 400], ['A4', 200], ['C5', 200], ['E5', 400], ['D5', 200], ['C5', 200],
-            ['B4', 600], ['C5', 200], ['D5', 400], ['E5', 400],
-            ['C5', 400], ['A4', 400], ['A4', 400], [0, 200],
-            
-            ['D5', 600], ['F5', 200], ['A5', 400], ['G5', 200], ['F5', 200],
-            ['E5', 600], ['C5', 200], ['E5', 400], ['D5', 200], ['C5', 200],
-            ['B4', 400], ['B4', 200], ['C5', 200], ['D5', 400], ['E5', 400],
-            ['C5', 400], ['A4', 400], ['A4', 400], [0, 200]
-        ];
-
-        // Mapeamento de Frequências (Hz) para Notas Musicais (Oitavas 4 e 5)
-        this.frequencies = {
-            'A4': 440.00, 'A#4': 466.16, 'B4': 493.88, 'C5': 523.25, 'C#5': 554.37,
-            'D5': 587.33, 'D#5': 622.25, 'E5': 659.25, 'F5': 698.46, 'F#5': 739.99,
-            'G5': 783.99, 'G#5': 830.61, 'A5': 880.00
+this.melodies = {
+            'classic': [
+                ['E5', 400], ['B4', 200], ['C5', 200], ['D5', 400], ['C5', 200], ['B4', 200],
+                ['A4', 400], ['A4', 200], ['C5', 200], ['E5', 400], ['D5', 200], ['C5', 200],
+                ['B4', 600], ['C5', 200], ['D5', 400], ['E5', 400], ['C5', 400], ['A4', 400],
+                ['A4', 800], [0, 400], ['D5', 600], ['F5', 200], ['A5', 400], ['G5', 200],
+                ['F5', 200], ['E5', 600], ['C5', 200], ['E5', 400], ['D5', 200], ['C5', 200],
+                ['B4', 400], ['B4', 200], ['C5', 200], ['D5', 400], ['E5', 400], ['C5', 400],
+                ['A4', 400], ['A4', 800], [0, 400], ['E5', 400], ['B4', 200], ['C5', 200],
+                ['D5', 400], ['C5', 200], ['B4', 200], ['A4', 400], ['A4', 200], ['C5', 200],
+                ['E5', 400], ['D5', 200], ['C5', 200], ['B4', 600], ['C5', 200], ['D5', 400],
+                ['E5', 400], ['C5', 400], ['A4', 400], ['A4', 800], [0, 400], ['D5', 600],
+                ['F5', 200], ['A5', 400], ['G5', 200], ['F5', 200], ['E5', 600], ['C5', 200],
+                ['E5', 400], ['D5', 200], ['C5', 200], ['B4', 400], ['B4', 200], ['C5', 200],
+                ['D5', 400], ['E5', 400], ['C5', 400], ['A4', 400], ['A4', 800], [0, 400],
+                ['E4', 800], ['C4', 800], ['D4', 800], ['B3', 800], ['C4', 800], ['A3', 800],
+                ['G#3', 800], ['B3', 800], ['E4', 800], ['C4', 800], ['D4', 800], ['B3', 800],
+                ['C4', 400], ['E4', 400], ['A4', 800], ['G#4', 800], [0, 800]
+            ],
+            'lord_of_the_rings': [
+                ['D4', 333], ['E4', 333], ['G4', 666], ['E4', 333], ['D4', 333], ['B3', 666],
+                ['D4', 1333], [0, 333], ['D4', 333], ['E4', 333], ['G4', 666], ['A4', 333],
+                ['B4', 333], ['A4', 333], ['G4', 333], ['E4', 666], ['G4', 1000], [0, 333],
+                ['D4', 333], ['E4', 333], ['G4', 666], ['E4', 333], ['D4', 333], ['B3', 666],
+                ['D4', 1333], [0, 333], ['G4', 333], ['A4', 333], ['B4', 666], ['D5', 333],
+                ['B4', 333], ['A4', 333], ['G4', 333], ['A4', 1333], [0, 666], ['D4', 333],
+                ['E4', 333], ['G4', 666], ['E4', 333], ['D4', 333], ['B3', 666], ['D4', 1333],
+                [0, 333], ['D4', 333], ['E4', 333], ['G4', 666], ['A4', 333], ['B4', 333],
+                ['A4', 333], ['G4', 333], ['E4', 666], ['G4', 1000], [0, 333], ['D4', 333],
+                ['E4', 333], ['G4', 666], ['E4', 333], ['D4', 333], ['B3', 666], ['D4', 1333],
+                [0, 333], ['G4', 333], ['A4', 333], ['B4', 666], ['D5', 333], ['B4', 333],
+                ['A4', 333], ['G4', 333], ['A4', 1333], [0, 666], ['G4', 333], ['A4', 333],
+                ['B4', 1000], ['B4', 333], ['B4', 666], ['C5', 666], ['B4', 666], ['A4', 666],
+                ['G4', 666], ['F#4', 666], ['E4', 1333], ['G4', 1333], ['D4', 2666], ['B4', 1000],
+                ['B4', 333], ['B4', 666], ['C5', 666], ['B4', 666], ['A4', 666], ['G4', 666],
+                ['A4', 666], ['B4', 666], ['D5', 666], ['E5', 1333], ['D5', 2666]
+            ],
+            'star_wars': [
+                ['G4', 370], ['G4', 370], ['G4', 370], ['C5', 1111], ['G5', 1111], ['F5', 370],
+                ['E5', 370], ['D5', 370], ['C6', 1111], ['G5', 555], ['F5', 370], ['E5', 370],
+                ['D5', 370], ['C6', 1111], ['G5', 555], ['F5', 370], ['E5', 370], ['F5', 370],
+                ['D5', 1111], [0, 555], ['G4', 370], ['G4', 370], ['G4', 370], ['C5', 1111],
+                ['G5', 1111], ['F5', 370], ['E5', 370], ['D5', 370], ['C6', 1111], ['G5', 555],
+                ['F5', 370], ['E5', 370], ['D5', 370], ['C6', 1111], ['G5', 555], ['F5', 370],
+                ['E5', 370], ['F5', 370], ['D5', 1111]
+            ],
+            'harry_potter': [
+                ['B4', 375], ['E5', 562], ['G5', 187], ['F#5', 375], ['E5', 750], ['B5', 375],
+                ['A5', 1125], ['F#5', 1125], ['E5', 562], ['G5', 187], ['F#5', 375], ['D#5', 750],
+                ['F5', 375], ['B4', 1125], [0, 750], ['B4', 375], ['E5', 562], ['G5', 187],
+                ['F#5', 375], ['E5', 750], ['B5', 375], ['D6', 750], ['C#6', 375], ['C6', 750],
+                ['G#5', 375], ['C6', 562], ['B5', 187], ['A#5', 375], ['A#4', 750], ['G5', 375],
+                ['E5', 1125], [0, 750], ['G5', 375], ['B5', 562], ['G5', 187], ['B5', 375],
+                ['B5', 562], ['G5', 187], ['B5', 375], ['D6', 750], ['C#6', 375], ['C6', 750],
+                ['G#5', 375], ['C6', 562], ['B5', 187], ['A#5', 375], ['A#4', 750], ['G5', 375],
+                ['B5', 1125], [0, 750], ['G5', 375], ['B5', 562], ['G5', 187], ['B5', 375],
+                ['B5', 562], ['G5', 187], ['B5', 375], ['D6', 750], ['C#6', 375], ['C6', 750],
+                ['G#5', 375], ['C6', 562], ['B5', 187], ['A#5', 375], ['A#4', 750], ['G5', 375],
+                ['E5', 1125]
+            ],
+            'pink_panther': [
+                ['C#4', 272], ['D4', 272], [0, 545], ['D#4', 272], ['E4', 272], [0, 545],
+                ['C#4', 272], ['D4', 272], ['D#4', 272], ['E4', 272], ['G4', 272], ['F#4', 272],
+                ['D4', 272], ['E4', 818], [0, 272], ['C#4', 136], ['D4', 136], ['D#4', 136],
+                ['E4', 136], ['G4', 272], ['F#4', 272], ['D4', 272], ['E4', 272], ['B4', 272],
+                ['G4', 272], ['B4', 272], ['E5', 818], [0, 1090], ['C#4', 272], ['D4', 272],
+                [0, 545], ['D#4', 272], ['E4', 272], [0, 545], ['C#4', 272], ['D4', 272],
+                ['D#4', 272], ['E4', 272], ['G4', 272], ['F#4', 272], ['D4', 272], ['E4', 818],
+                [0, 272], ['C#4', 136], ['D4', 136], ['D#4', 136], ['E4', 136], ['G4', 272],
+                ['F#4', 272], ['D4', 272], ['E4', 272], ['B4', 272], ['G4', 272], ['B4', 272],
+                ['E5', 818], [0, 1090]
+            ],
+            'gameboy': [
+                ['E5', 150], ['E5', 150], [0, 150], ['E5', 150], [0, 150], ['C5', 150],
+                ['E5', 300], ['G5', 300], [0, 300], ['G4', 300], [0, 300], ['C5', 450],
+                ['G4', 450], ['E4', 300], [0, 150], ['A4', 300], ['B4', 300], ['A#4', 150],
+                ['A4', 300], ['G4', 199], ['E5', 199], ['G5', 199], ['A5', 300], ['F5', 150],
+                ['G5', 150], [0, 150], ['E5', 300], ['C5', 150], ['D5', 150], ['B4', 450],
+                ['C5', 450], ['G4', 450], ['E4', 300], [0, 150], ['A4', 300], ['B4', 300],
+                ['A#4', 150], ['A4', 300], ['G4', 199], ['E5', 199], ['G5', 199], ['A5', 300],
+                ['F5', 150], ['G5', 150], [0, 150], ['E5', 300], ['C5', 150], ['D5', 150],
+                ['B4', 450]
+            ],
+            'cyberpunk': [
+                ['A3', 115], ['E4', 115], ['A4', 115], ['E4', 115], ['C4', 115], ['E4', 115],
+                ['A4', 115], ['E4', 115], ['A3', 115], ['E4', 115], ['A4', 115], ['E4', 115],
+                ['C4', 115], ['E4', 115], ['A4', 115], ['E4', 115], ['F3', 115], ['C4', 115],
+                ['F4', 115], ['C4', 115], ['A3', 115], ['C4', 115], ['F4', 115], ['C4', 115],
+                ['G3', 115], ['D4', 115], ['G4', 115], ['D4', 115], ['B3', 115], ['D4', 115],
+                ['G4', 115], ['D4', 115], ['A3', 115], ['E4', 115], ['A4', 115], ['E4', 115],
+                ['C4', 115], ['E4', 115], ['A4', 115], ['E4', 115], ['A3', 115], ['E4', 115],
+                ['A4', 115], ['E4', 115], ['C4', 115], ['E4', 115], ['A4', 115], ['E4', 115],
+                ['F3', 115], ['C4', 115], ['F4', 115], ['C4', 115], ['A3', 115], ['C4', 115],
+                ['F4', 115], ['C4', 115], ['G3', 115], ['D4', 115], ['G4', 115], ['D4', 115],
+                ['B3', 115], ['D4', 115], ['G4', 115], ['D4', 115]
+            ],
+            'retro_future': [
+                ['C3', 187], ['E3', 187], ['G3', 187], ['B3', 187], ['C4', 187], ['B3', 187],
+                ['G3', 187], ['E3', 187], ['C3', 187], ['E3', 187], ['G3', 187], ['B3', 187],
+                ['C4', 187], ['B3', 187], ['G3', 187], ['E3', 187], ['A2', 187], ['C3', 187],
+                ['E3', 187], ['G3', 187], ['A3', 187], ['G3', 187], ['E3', 187], ['C3', 187],
+                ['F2', 187], ['A2', 187], ['C3', 187], ['E3', 187], ['F3', 187], ['E3', 187],
+                ['C3', 187], ['A2', 187], ['C3', 187], ['E3', 187], ['G3', 187], ['B3', 187],
+                ['C4', 187], ['B3', 187], ['G3', 187], ['E3', 187], ['C3', 187], ['E3', 187],
+                ['G3', 187], ['B3', 187], ['C4', 187], ['B3', 187], ['G3', 187], ['E3', 187],
+                ['A2', 187], ['C3', 187], ['E3', 187], ['G3', 187], ['A3', 187], ['G3', 187],
+                ['E3', 187], ['C3', 187], ['F2', 187], ['A2', 187], ['C3', 187], ['E3', 187],
+                ['F3', 187], ['E3', 187], ['C3', 187], ['A2', 187]
+            ]
         };
+
+        this.currentMelody = this.melodies['classic'];
+
+        // Mapeamento de Frequências Completo (Oitavas 2 a 7)
+        this.frequencies = {
+            'C2': 65.41, 'C#2': 69.3, 'D2': 73.42, 'D#2': 77.78, 'E2': 82.41,
+            'F2': 87.31, 'F#2': 92.5, 'G2': 98.0, 'G#2': 103.83, 'A2': 110.0,
+            'A#2': 116.54, 'B2': 123.47, 'C3': 130.81, 'C#3': 138.59, 'D3': 146.83,
+            'D#3': 155.56, 'E3': 164.81, 'F3': 174.61, 'F#3': 185.0, 'G3': 196.0,
+            'G#3': 207.65, 'A3': 220.0, 'A#3': 233.08, 'B3': 246.94, 'C4': 261.63,
+            'C#4': 277.18, 'D4': 293.66, 'D#4': 311.13, 'E4': 329.63, 'F4': 349.23,
+            'F#4': 369.99, 'G4': 392.0, 'G#4': 415.3, 'A4': 440.0, 'A#4': 466.16,
+            'B4': 493.88, 'C5': 523.25, 'C#5': 554.37, 'D5': 587.33, 'D#5': 622.25,
+            'E5': 659.26, 'F5': 698.46, 'F#5': 739.99, 'G5': 783.99, 'G#5': 830.61,
+            'A5': 880.0, 'A#5': 932.33, 'B5': 987.77, 'C6': 1046.5, 'C#6': 1108.73,
+            'D6': 1174.66, 'D#6': 1244.51, 'E6': 1318.51, 'F6': 1396.91, 'F#6': 1479.98,
+            'G6': 1567.98, 'G#6': 1661.22, 'A6': 1760.0, 'A#6': 1864.66, 'B6': 1975.53,
+            'C7': 2093.0, 'C#7': 2217.46, 'D7': 2349.32, 'D#7': 2489.02, 'E7': 2637.02,
+            'F7': 2793.83, 'F#7': 2959.96, 'G7': 3135.96, 'G#7': 3322.44, 'A7': 3520.0,
+            'A#7': 3729.31, 'B7': 3951.07
+        };
+    }
+
+    // Configura a melodia baseada na skin
+    setTheme(themeId) {
+        this.currentMelody = this.melodies[themeId] || this.melodies['classic'];
+        this.musicStep = 0;
     }
 
     init() {
         if (!this.ctx) {
             // Cria o contexto de áudio apenas na primeira interação do usuário
             this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (this.ctx.state === 'suspended') {
+            this.ctx.resume();
         }
     }
 
@@ -119,32 +241,61 @@ class SoundManager {
         });
     }
 
-    // Inicia e agenda o loop da melodia retro
+    // Toca uma nota musical com agendamento preciso
+    playMusicNote(freq, type, duration, startTime) {
+        if (!this.musicEnabled || !this.ctx) return;
+        
+        try {
+            const osc = this.ctx.createOscillator();
+            const gainNode = this.ctx.createGain();
+            
+            osc.type = type;
+            osc.frequency.setValueAtTime(freq, startTime);
+            
+            // Envelope simples para suavizar a nota
+            gainNode.gain.setValueAtTime(0, startTime);
+            gainNode.gain.linearRampToValueAtTime(0.08, startTime + 0.02);
+            gainNode.gain.setValueAtTime(0.08, startTime + duration - 0.05);
+            gainNode.gain.linearRampToValueAtTime(0, startTime + duration);
+            
+            osc.connect(gainNode);
+            gainNode.connect(this.ctx.destination);
+            
+            osc.start(startTime);
+            osc.stop(startTime + duration);
+        } catch (e) {
+            console.warn('Erro ao tocar nota musical:', e);
+        }
+    }
+
+    // Inicia e agenda o loop da melodia com tempo preciso do AudioContext
     startMusic() {
         this.init();
-        if (this.musicInterval) return;
+        if (this.musicEnabled) return;
         
         this.musicEnabled = true;
-        this.musicStep = 0;
+        let nextNoteTime = this.ctx.currentTime;
+        let index = 0;
         
-        const scheduleNextNote = () => {
+        const scheduler = () => {
             if (!this.musicEnabled) return;
             
-            const current = this.melody[this.musicStep];
-            const note = current[0];
-            const duration = current[1];
-            
-            if (note !== 0 && this.frequencies[note]) {
-                const freq = this.frequencies[note];
-                // Toca um sintetizador do tipo 'triangle' bem suave para a música de fundo
-                this.playSynth(freq, 'triangle', duration / 1000, 0.06, 0.001);
+            while (nextNoteTime < this.ctx.currentTime + 0.1) {
+                const current = this.currentMelody[index];
+                const note = current[0];
+                const duration = current[1] / 1000;
+                
+                if (note !== 0 && this.frequencies[note]) {
+                    this.playMusicNote(this.frequencies[note], 'triangle', duration, nextNoteTime);
+                }
+                
+                nextNoteTime += duration;
+                index = (index + 1) % this.currentMelody.length;
             }
-            
-            this.musicStep = (this.musicStep + 1) % this.melody.length;
-            this.musicInterval = setTimeout(scheduleNextNote, duration);
+            requestAnimationFrame(scheduler);
         };
         
-        scheduleNextNote();
+        scheduler();
     }
 
     stopMusic() {
@@ -171,8 +322,8 @@ const COLS = 10;
 const ROWS = 20;
 let BLOCK_SIZE = 30; // 30px por bloco (dinâmico baseado no resize)
 
-// Cores Modernas com Efeito Neon
-const COLORS = {
+// Cores Modernas com Efeito Neon (Mutável via Temas da Loja)
+let COLORS = {
     0: '#000000',
     1: '#00f0ff', // I - Cyan
     2: '#ffff00', // O - Yellow
@@ -183,8 +334,8 @@ const COLORS = {
     7: '#ff5f1f'  // L - Orange
 };
 
-// Cores de Sombra Glow para as Peças
-const GLOW_COLORS = {
+// Cores de Sombra Glow para as Peças (Mutável via Temas da Loja)
+let GLOW_COLORS = {
     1: 'rgba(0, 240, 255, 0.75)',
     2: 'rgba(255, 255, 0, 0.75)',
     3: 'rgba(157, 78, 221, 0.75)',
@@ -297,6 +448,9 @@ class GameEngine {
             this.resizeCanvas();
             this.draw();
         });
+        
+        // Carrega o tema selecionado ativamente na nuvem
+        this.loadActiveTheme();
     }
 
     resizeCanvas() {
@@ -388,6 +542,22 @@ class GameEngine {
                 this.submitHighScore();
             }
         });
+
+        // Botão de Abrir Loja
+        const btnOpenStore = document.getElementById('btn-open-store');
+        if (btnOpenStore) {
+            btnOpenStore.addEventListener('click', () => {
+                this.openStore();
+            });
+        }
+
+        // Botão de Fechar Loja
+        const btnCloseStore = document.getElementById('btn-close-store');
+        if (btnCloseStore) {
+            btnCloseStore.addEventListener('click', () => {
+                this.closeStore();
+            });
+        }
     }
 
     start() {
@@ -397,13 +567,20 @@ class GameEngine {
         this.isGameOver = false;
         this.isPaused = false;
         
-        // Reseta atributos
+        // Reseta atributos e inicializa gravação de telemetria
         this.score = 0;
         this.level = 1;
         this.lines = 0;
         this.board = this.createBoard();
         this.particles = [];
         this.bag = [];
+        
+        this.keystrokes = [];
+        this.gameStartTime = performance.now();
+        
+        // Atributos de Estratégias de Bonificações
+        this.comboCount = 0;
+        this.lastWasTetris = false;
         
         this.updateStatsDisplay();
         
@@ -617,16 +794,59 @@ class GameEngine {
         if (clearedCount > 0) {
             this.lines += clearedCount;
             
+            // Incrementa o Combo de limpezas sequenciais!
+            this.comboCount++;
+            
             // Fase 3: Telemetria de Linhas Limpas
             sendTelemetry('line_clear', clearedCount);
+            
+            let pointsGained = 0;
+            const scoreMultiplier = [0, 100, 300, 500, 800];
+            
             if (clearedCount === 4) {
                 sendTelemetry('tetris_clear', 1);
-                this.showFloatingEvent('TETRIS!', 'tetris');
+                
+                // 1. Super Bônus de Tetris Progressivo por Nível
+                const baseTetrisPoints = 800 * this.level;
+                const progressiveBonus = Math.round(1000 * Math.pow(this.level, 1.5));
+                pointsGained = baseTetrisPoints + progressiveBonus;
+                
+                // 2. Bônus de Back-to-Back Tetris (+50%)
+                if (this.lastWasTetris) {
+                    pointsGained = Math.round(pointsGained * 1.5);
+                    this.showFloatingEvent('⚡ BACK-TO-BACK TETRIS! ⚡', 'b2b');
+                } else {
+                    this.showFloatingEvent('TETRIS!', 'tetris');
+                }
+                
+                this.lastWasTetris = true;
+            } else {
+                pointsGained = scoreMultiplier[clearedCount] * this.level;
+                this.lastWasTetris = false; // Quebrou a sequência de Back-to-Back Tetris
             }
             
-            // Sistema de Pontuação Clássico Multiplicado pelo Nível
-            const scoreMultiplier = [0, 100, 300, 500, 800];
-            this.score += scoreMultiplier[clearedCount] * this.level;
+            // 3. Multiplicador de Combo Sequencial
+            if (this.comboCount > 1) {
+                const comboMultiplier = 1 + ((this.comboCount - 1) * 0.5);
+                pointsGained = Math.round(pointsGained * comboMultiplier);
+                
+                // Mostra evento flutuante de combo
+                setTimeout(() => {
+                    this.showFloatingEvent(`🔥 COMBO x${this.comboCount}! +${(this.comboCount - 1) * 50}% BONUS! 🔥`, 'combo');
+                }, 300);
+            }
+            
+            // 4. Bônus de Perfect Clear (Tabuleiro totalmente vazio após a limpa!)
+            const isBoardEmpty = this.board.every(row => row.every(val => val === 0));
+            if (isBoardEmpty) {
+                pointsGained += 20000;
+                setTimeout(() => {
+                    this.showFloatingEvent('⭐ PERFECT CLEAR! +20.000 PTS ⭐', 'perfect');
+                }, 600);
+            }
+            
+            // Soma os pontos finais calculados
+            this.score += pointsGained;
             
             // Aumenta nível a cada 10 linhas limpas
             const newLevel = Math.floor(this.lines / 10) + 1;
@@ -645,6 +865,9 @@ class GameEngine {
             setTimeout(() => fetchAndShowAchievements(), 500);
             
             this.updateStatsDisplay();
+        } else {
+            // Se nenhuma linha foi limpa nessa peça que fixou, o Combo sequencial é quebrado!
+            this.comboCount = 0;
         }
     }
 
@@ -750,9 +973,13 @@ class GameEngine {
         
         const btn = document.getElementById('btn-submit-score');
         btn.disabled = true;
-        btn.textContent = 'Salvando...';
+        btn.textContent = 'Orquestrando...';
         
-        const success = await submitScore(name, this.score, this.level, this.lines);
+        const chkBot = document.getElementById('chk-simulate-bot');
+        const isBotSimulated = chkBot ? chkBot.checked : false;
+        
+        // Envia o placar de forma orquestrada com gravação das teclas para o Anti-Cheat
+        const success = await submitScore(name, this.score, this.level, this.lines, this.keystrokes, isBotSimulated);
         
         if (success) {
             document.getElementById('new-high-score-form').classList.add('hidden');
@@ -779,6 +1006,14 @@ class GameEngine {
         }
         
         if (this.isPaused || this.isGameOver) return;
+        
+        // Captura a telemetria de toques para análise de anti-cheat com IA
+        if (this.keystrokes) {
+            this.keystrokes.push({
+                key: e.key,
+                t: performance.now() - this.gameStartTime
+            });
+        }
         
         switch (e.key) {
             case 'ArrowLeft':
@@ -1012,6 +1247,293 @@ class GameEngine {
                 }
             });
         });
+    }
+
+    // --- MÉTODOS ADICIONADOS DE TEMAS, LOJA & ORQUESTRADO SAGA ---
+
+    async loadActiveTheme() {
+        try {
+            const data = await fetchStoreCatalog();
+            if (data && data.active_skin) {
+                this.applyThemePalette(data.active_skin);
+            }
+        } catch (e) {
+            console.warn("Falha ao carregar tema inicial do servidor.", e);
+        }
+    }
+
+    async openStore() {
+        if (this.isPlaying && !this.isPaused) {
+            this.togglePause();
+        }
+        
+        document.getElementById('store-modal').classList.remove('hidden');
+        
+        // Mostra o terminal do Maestro da Loja e limpa-o
+        const terminalEl = document.getElementById('store-maestro-terminal');
+        if (terminalEl) {
+            terminalEl.classList.add('hidden');
+            terminalEl.innerHTML = '';
+        }
+        
+        this.updateStoreView();
+    }
+
+    closeStore() {
+        document.getElementById('store-modal').classList.add('hidden');
+    }
+
+    async updateStoreView() {
+        const catalogListEl = document.getElementById('store-catalog-list');
+        const balanceEl = document.getElementById('store-coin-balance');
+        
+        if (!catalogListEl || !balanceEl) return;
+        
+        catalogListEl.innerHTML = '<p class="loading">Sincronizando catálogo com a nuvem...</p>';
+        
+        const data = await fetchStoreCatalog();
+        if (!data) {
+            catalogListEl.innerHTML = '<p class="loading" style="color: var(--neon-red)">Falha de rede ao conectar à Nuvem.</p>';
+            return;
+        }
+        
+        // Se a sessão do usuário estiver banida, exibe tela de bloqueio dedicada
+        if (data.isBanned) {
+            catalogListEl.innerHTML = `
+                <div style="text-align: center; padding: 20px; border: 2px dashed var(--neon-red); background: rgba(255, 49, 49, 0.08); border-radius: 4px; margin-top: 10px;">
+                    <p class="blink" style="color: var(--neon-red); font-size: 14px; font-weight: bold; margin-bottom: 8px; letter-spacing: 1px;">🚫 CONTA BLOQUEADA POR TRAPAÇA</p>
+                    <p style="color: #bbb; font-size: 10px; line-height: 1.5; font-family: 'Share Tech Mono', monospace;">Seu ID de sessão foi permanentemente banido da nossa infraestrutura serverless por uso de Bots/Cheats detectado pelo classificador de IA de telemetria.<br><br>O acesso à carteira, catálogo de skins e o envio de pontuações de recordes foram revogados para este ID.</p>
+                </div>
+            `;
+            balanceEl.textContent = "0";
+            return;
+        }
+        
+        balanceEl.textContent = data.balance.toLocaleString();
+        catalogListEl.innerHTML = ''; // Limpa catálogo
+        
+        data.catalog.forEach(item => {
+            const card = document.createElement('div');
+            card.className = `skin-card ${item.is_active ? 'equipped' : ''}`;
+            
+            // Informações
+            const info = document.createElement('div');
+            info.className = 'skin-info';
+            
+            const name = document.createElement('div');
+            name.className = 'skin-name';
+            name.textContent = item.name.toUpperCase();
+            
+            const desc = document.createElement('div');
+            desc.className = 'skin-desc';
+            desc.textContent = item.description;
+            
+            info.appendChild(name);
+            info.appendChild(desc);
+            
+            // Preço (se não desbloqueado)
+            if (!item.is_unlocked) {
+                const price = document.createElement('div');
+                price.className = 'skin-price';
+                price.innerHTML = `${item.price.toLocaleString()} <span>🪙</span>`;
+                info.appendChild(price);
+            }
+            
+            // Ações
+            const action = document.createElement('div');
+            action.className = 'skin-action';
+            
+            const btn = document.createElement('button');
+            btn.className = 'arcade-btn skin-btn';
+            
+            if (item.is_active) {
+                btn.className += ' active';
+                btn.textContent = 'EQUIPADO';
+                btn.disabled = true;
+            } else if (item.is_unlocked) {
+                btn.className += ' equip';
+                btn.textContent = 'EQUIPAR';
+                btn.addEventListener('click', async () => {
+                    btn.disabled = true;
+                    btn.textContent = 'Carregando...';
+                    const res = await equipSkin(item.skin_id);
+                    if (res && res.status === 'success') {
+                        this.applyThemePalette(item.skin_id);
+                        this.updateStoreView();
+                        this.draw();
+                    } else {
+                        alert('Falha ao selecionar tema.');
+                        btn.disabled = false;
+                        btn.textContent = 'EQUIPAR';
+                    }
+                });
+            } else {
+                btn.className += ' buy';
+                btn.textContent = 'COMPRAR';
+                
+                // Se o saldo for menor, desativa botão de compra
+                if (data.balance < item.price) {
+                    btn.disabled = true;
+                    btn.style.opacity = '0.4';
+                    btn.style.cursor = 'not-allowed';
+                }
+                
+                btn.addEventListener('click', async () => {
+                    // Desativa todos os botões de compra para focar na orquestração
+                    const allButtons = catalogListEl.querySelectorAll('.skin-btn');
+                    allButtons.forEach(b => b.disabled = true);
+                    
+                    btn.textContent = 'Processando...';
+                    
+                    // Redireciona os logs do terminal de orquestração da compra
+                    const storeTerminal = document.getElementById('store-maestro-terminal');
+                    if (storeTerminal) {
+                        storeTerminal.classList.remove('hidden');
+                        storeTerminal.innerHTML = '<div class="terminal-header">Maestro Console (GCP Workflows Engine)</div>';
+                        
+                        // Criamos um elemento de log global para a função renderOrchestratorLogs usar
+                        const originalTerminal = document.getElementById('maestro-terminal');
+                        
+                        // Temporariamente faz com que o id maestro-terminal aponte para o terminal da loja!
+                        storeTerminal.id = 'maestro-terminal';
+                        if (originalTerminal) originalTerminal.id = 'temp-maestro-terminal';
+                        
+                        // Dispara a SAGA orquestrada!
+                        const res = await buySkinOrchestrated(item.skin_id);
+                        
+                        // Restaura os IDs originais após a animação de logs começar
+                        setTimeout(() => {
+                            storeTerminal.id = 'store-maestro-terminal';
+                            if (originalTerminal) originalTerminal.id = 'maestro-terminal';
+                        }, 2500);
+                        
+                        if (res && res.status === 'success') {
+                            setTimeout(() => alert(`Sucesso! Tema '${item.name}' adquirido via orquestrador SAGA!`), 2200);
+                        } else if (res && res.status === 'rolled_back') {
+                            setTimeout(() => alert(`SAGA ROLLBACK DETECTADO!\nA entrega do item falhou no Inventário, então o Maestro (orquestrador) executou uma transação compensatória de reembolso na sua carteira!`), 2200);
+                        } else if (res && res.status === 'dlq_error') {
+                            setTimeout(() => alert(`ERRO CRÍTICO DUPLO!\nA entrega da skin falhou E a transação compensatória também falhou. O incidente foi encaminhado para a Dead-Letter Queue (DLQ) no Pub/Sub.`), 2200);
+                        } else {
+                            setTimeout(() => alert(`Erro na orquestração: ${res ? res.message : 'Falha desconhecida'}`), 2200);
+                        }
+                    } else {
+                        // Sem terminal: apenas dispara compra
+                        const res = await buySkinOrchestrated(item.skin_id);
+                        if (res && res.status === 'success') {
+                            alert(`Sucesso! Tema '${item.name}' adquirido via orquestrador SAGA!`);
+                        }
+                    }
+                    
+                    setTimeout(() => {
+                        this.updateStoreView();
+                        this.draw();
+                    }, 2500); // Aguarda a animação dos logs terminar
+                });
+            }
+            
+            action.appendChild(btn);
+            card.appendChild(info);
+            card.appendChild(action);
+            catalogListEl.appendChild(card);
+        });
+    }
+
+    applyThemePalette(themeId) {
+        // Atualiza a melodia no SoundManager
+        audio.setTheme(themeId);
+        
+        const THEME_PALETTES = {
+            "classic": {
+                COLORS: {
+                    0: '#000000', 1: '#00f0ff', 2: '#ffff00', 3: '#9d4edd', 4: '#39ff14', 5: '#ff3131', 6: '#0055ff', 7: '#ff5f1f'
+                },
+                GLOW_COLORS: {
+                    1: 'rgba(0, 240, 255, 0.75)', 2: 'rgba(255, 255, 0, 0.75)', 3: 'rgba(157, 78, 221, 0.75)', 4: 'rgba(57, 255, 20, 0.75)', 5: 'rgba(255, 49, 49, 0.75)', 6: 'rgba(0, 85, 255, 0.75)', 7: 'rgba(255, 95, 31, 0.75)'
+                }
+            },
+            "star_wars": {
+                COLORS: {
+                    0: '#03030c', 1: '#0066ff', 2: '#00ff33', 3: '#b000ff', 4: '#ff0000', 5: '#00ffff', 6: '#ffcc00', 7: '#e0e0e0'
+                },
+                GLOW_COLORS: {
+                    1: 'rgba(0, 102, 255, 0.85)', 2: 'rgba(0, 255, 51, 0.85)', 3: 'rgba(176, 0, 255, 0.85)', 4: 'rgba(255, 0, 0, 0.85)', 5: 'rgba(0, 255, 255, 0.85)', 6: 'rgba(255, 204, 0, 0.85)', 7: 'rgba(224, 224, 224, 0.85)'
+                }
+            },
+            "harry_potter": {
+                COLORS: {
+                    0: '#0d001a', 1: '#9e0000', 2: '#ffcc00', 3: '#00703c', 4: '#cccccc', 5: '#003da5', 6: '#cd7f32', 7: '#f0c300'
+                },
+                GLOW_COLORS: {
+                    1: 'rgba(158, 0, 0, 0.85)', 2: 'rgba(255, 204, 0, 0.85)', 3: 'rgba(0, 112, 60, 0.85)', 4: 'rgba(204, 204, 204, 0.85)', 5: 'rgba(0, 61, 165, 0.85)', 6: 'rgba(205, 127, 50, 0.85)', 7: 'rgba(240, 195, 0, 0.85)'
+                }
+            },
+            "lord_of_the_rings": {
+                COLORS: {
+                    0: '#120d03', 1: '#ffaa00', 2: '#007f30', 3: '#f0f0f0', 4: '#ff3300', 5: '#151522', 6: '#ff7700', 7: '#ee99ff'
+                },
+                GLOW_COLORS: {
+                    1: 'rgba(255, 170, 0, 0.85)', 2: 'rgba(0, 127, 48, 0.85)', 3: 'rgba(240, 240, 240, 0.85)', 4: 'rgba(255, 51, 0, 0.85)', 5: 'rgba(21, 21, 34, 0.85)', 6: 'rgba(255, 119, 0, 0.85)', 7: 'rgba(238, 153, 255, 0.85)'
+                }
+            },
+            "pink_panther": {
+                COLORS: {
+                    0: '#300020', 1: '#ff66b2', 2: '#ff007f', 3: '#e0b0ff', 4: '#da70d6', 5: '#ffb3ba', 6: '#fadadd', 7: '#3a005c'
+                },
+                GLOW_COLORS: {
+                    1: 'rgba(255, 102, 178, 0.85)', 2: 'rgba(255, 0, 127, 0.85)', 3: 'rgba(224, 176, 255, 0.85)', 4: 'rgba(218, 112, 214, 0.85)', 5: 'rgba(255, 179, 186, 0.85)', 6: 'rgba(250, 218, 221, 0.85)', 7: 'rgba(58, 0, 92, 0.85)'
+                }
+            },
+            "gameboy": {
+                COLORS: {
+                    0: '#0f380f', 1: '#306230', 2: '#8bac0f', 3: '#9bbc0f', 4: '#306230', 5: '#8bac0f', 6: '#9bbc0f', 7: '#306230'
+                },
+                GLOW_COLORS: {
+                    1: 'rgba(48, 98, 48, 0.75)', 2: 'rgba(139, 172, 15, 0.75)', 3: 'rgba(155, 188, 15, 0.75)', 4: 'rgba(48, 98, 48, 0.75)', 5: 'rgba(139, 172, 15, 0.75)', 6: 'rgba(155, 188, 15, 0.75)', 7: 'rgba(48, 98, 48, 0.75)'
+                }
+            },
+            "cyberpunk": {
+                COLORS: {
+                    0: '#0d0211', 1: '#ff007f', 2: '#ff5e00', 3: '#ffb700', 4: '#8b00ff', 5: '#ee82ee', 6: '#4b0082', 7: '#00ffff'
+                },
+                GLOW_COLORS: {
+                    1: 'rgba(255, 0, 127, 0.75)', 2: 'rgba(255, 94, 0, 0.75)', 3: 'rgba(255, 183, 0, 0.75)', 4: 'rgba(139, 0, 255, 0.75)', 5: 'rgba(238, 130, 238, 0.75)', 6: 'rgba(75, 0, 130, 0.75)', 7: 'rgba(0, 255, 255, 0.75)'
+                }
+            },
+            "retro_future": {
+                COLORS: {
+                    0: '#00001a', 1: '#00f0ff', 2: '#00d0ff', 3: '#00aaff', 4: '#0088ff', 5: '#0055ff', 6: '#0022ff', 7: '#0099ff'
+                },
+                GLOW_COLORS: {
+                    1: 'rgba(0, 240, 255, 0.75)', 2: 'rgba(0, 208, 255, 0.75)', 3: 'rgba(0, 170, 255, 0.75)', 4: 'rgba(0, 136, 255, 0.75)', 5: 'rgba(0, 85, 255, 0.75)', 6: 'rgba(0, 34, 255, 0.75)', 7: 'rgba(0, 153, 255, 0.75)'
+                }
+            }
+        };
+
+        const palette = THEME_PALETTES[themeId] || THEME_PALETTES["classic"];
+        COLORS = { ...palette.COLORS };
+        GLOW_COLORS = { ...palette.GLOW_COLORS };
+        
+        // Aplica cores de fundo do canvas principal
+        const canvasEl = document.getElementById('tetris-canvas');
+        if (canvasEl) {
+            if (themeId === 'gameboy') {
+                canvasEl.style.backgroundColor = '#8bac0f';
+            } else if (themeId === 'cyberpunk') {
+                canvasEl.style.backgroundColor = '#0d0211';
+            } else if (themeId === 'retro_future') {
+                canvasEl.style.backgroundColor = '#00001a';
+            } else if (themeId === 'star_wars') {
+                canvasEl.style.backgroundColor = '#03030c';
+            } else if (themeId === 'harry_potter') {
+                canvasEl.style.backgroundColor = '#0d001a';
+            } else if (themeId === 'lord_of_the_rings') {
+                canvasEl.style.backgroundColor = '#120d03';
+            } else if (themeId === 'pink_panther') {
+                canvasEl.style.backgroundColor = '#300020';
+            } else {
+                canvasEl.style.backgroundColor = '#000000';
+            }
+        }
     }
 }
 

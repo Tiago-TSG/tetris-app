@@ -216,15 +216,24 @@ function showAchievementToast(newBadgeIds) {
  * @param {number} level Nível atingido
  * @param {number} lines Quantidade de linhas completadas
  */
-async function submitScore(name, score, level, lines) {
+/**
+ * Envia uma nova pontuação de recorde para o backend de forma orquestrada (Anti-Cheat)
+ * @param {string} name Nome do jogador
+ * @param {number} score Pontuação total
+ * @param {number} level Nível atingido
+ * @param {number} lines Quantidade de linhas completadas
+ * @param {Array} keystrokes Gravação de toques de teclas coletados durante a partida
+ * @param {boolean} isBotSimulated Flag para simular um Bot (Cheat) e disparar o anti-cheat
+ */
+async function submitScore(name, score, level, lines, keystrokes = [], isBotSimulated = false) {
     try {
         const trimmedName = name.trim().toUpperCase() || 'ANÔNIMO';
         
-        // Exibe o status de progresso direto no modal, entre o input e o botão (Ingestão iniciada)
-        updatePubSubStatus("ENVIANDO PARA A FILA PUB/SUB...", "info");
+        // Exibe o status de progresso direto no modal, entre o input e o botão
+        updatePubSubStatus("ORQUESTRANDO ENTREGA DO SCORE (ANTI-CHEAT)...", "info");
         
-        // Dispara a requisição assíncrona POST para o backend
-        const responsePromise = fetch('/api/scores', {
+        // Dispara a requisição assíncrona POST para o backend orquestrado
+        const responsePromise = fetch('/api/orchestrate/submit-score', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -234,7 +243,9 @@ async function submitScore(name, score, level, lines) {
                 score: score,
                 level: level,
                 lines: lines,
-                session_id: getSessionId()
+                session_id: getSessionId(),
+                keystrokes: keystrokes,
+                is_bot_simulated: isBotSimulated
             })
         });
 
@@ -244,7 +255,7 @@ async function submitScore(name, score, level, lines) {
         const scoresListElement = document.getElementById('scores-list');
         const currentScores = [];
         
-        if (scoresListElement) {
+        if (scoresListElement && !isBotSimulated) {
             const listItems = scoresListElement.querySelectorAll('li:not(.loading)');
             listItems.forEach(li => {
                 const nameSpan = li.querySelector('.score-name');
@@ -264,32 +275,53 @@ async function submitScore(name, score, level, lines) {
             });
         }
         
-        // Adiciona o novo recorde otimista
-        currentScores.push({
-            name: trimmedName,
-            score: score,
-            level: level,
-            lines: lines,
-            isOptimistic: true // Ativa o efeito visual neon verde de sincronização
-        });
-        
-        // Ordena por maior pontuação e limita aos top 10
-        const sortedScores = currentScores
-            .sort((a, b) => b.score - a.score)
-            .slice(0, 10);
+        if (!isBotSimulated) {
+            // Adiciona o novo recorde otimista
+            currentScores.push({
+                name: trimmedName,
+                score: score,
+                level: level,
+                lines: lines,
+                isOptimistic: true // Ativa o efeito visual neon verde de sincronização
+            });
             
-        // Renderiza instantaneamente em menos de 5ms na tela do jogador
-        renderScores(sortedScores);
+            // Ordena por maior pontuação e limita aos top 10
+            const sortedScores = currentScores
+                .sort((a, b) => b.score - a.score)
+                .slice(0, 10);
+                
+            // Renderiza instantaneamente em menos de 5ms na tela do jogador
+            renderScores(sortedScores);
+        }
 
-        // Aguarda a resposta do backend (que joga no Pub/Sub de forma ultrarrápida)
+        // Aguarda a resposta do backend (que executa a orquestração de anti-cheat)
         const response = await responsePromise;
+        const resultData = await response.json();
+
+        // Renderiza os logs do orquestrador no modal para fins didáticos!
+        if (resultData.logs) {
+            renderOrchestratorLogs(resultData.logs);
+        }
 
         if (!response.ok) {
-            throw new Error('Erro ao enviar pontuação para o servidor.');
+            if (response.status === 403) {
+                updatePubSubStatus("SESSÃO BANIDA POR TRAPAÇA!", "info");
+                alert("Trapaça detectada! Sua sessão foi banida permanentemente e seu score descartado.");
+                location.reload(); // Recarrega para aplicar o bloqueio
+                return false;
+            }
+            throw new Error(resultData.detail || 'Erro ao processar pontuação.');
+        }
+
+        if (resultData.status === "banned") {
+            updatePubSubStatus("DETECTOR DE CHEATS: BANIDO!", "info");
+            alert("AUTO-BOT DETECTADO! Sua sessão foi permanentemente banida da infraestrutura.");
+            location.reload();
+            return false;
         }
 
         // Exibe o status informando que foi recebido pela fila de mensageria com sucesso
-        updatePubSubStatus("RECEBIDO! SALVANDO NO FIRESTORE...", "success");
+        updatePubSubStatus("VALIDADO! SALVANDO NO FIRESTORE...", "success");
 
         // Retorna uma Promise que resolve após a sincronização, mantendo o modal aberto
         // para o jogador conseguir ler as etapas ocorrendo em tempo real!
@@ -317,6 +349,100 @@ async function submitScore(name, score, level, lines) {
         }, 3000);
         alert('Não foi possível salvar sua pontuação no ranking da nuvem, mas parabéns pela partida!');
         return false;
+    }
+}
+
+/**
+ * Exibe os logs do orquestrador em um console visual didático
+ * @param {Array} logs Lista de strings contendo os logs do Maestro
+ */
+function renderOrchestratorLogs(logs) {
+    const terminalEl = document.getElementById('maestro-terminal');
+    if (!terminalEl) return;
+    
+    terminalEl.classList.remove('hidden');
+    terminalEl.innerHTML = '<div class="terminal-header">Maestro Console (GCP Workflows Engine)</div>';
+    
+    logs.forEach((log, index) => {
+        setTimeout(() => {
+            const line = document.createElement('div');
+            line.className = 'terminal-line';
+            
+            if (log.includes('[WalletService]') || log.includes('debit') || log.includes('credit')) {
+                line.classList.add('log-wallet');
+            } else if (log.includes('[InventoryService]') || log.includes('unlock')) {
+                line.classList.add('log-inventory');
+            } else if (log.includes('[AntiCheat') || log.includes('IA')) {
+                line.classList.add('log-anticheat');
+            } else if (log.includes('Erro') || log.includes('FAIL') || log.includes('TRANSAÇÃO COMPENSATÓRIA')) {
+                line.classList.add('log-error');
+            } else {
+                line.classList.add('log-maestro');
+            }
+            
+            line.textContent = log;
+            terminalEl.appendChild(line);
+            terminalEl.scrollTop = terminalEl.scrollHeight;
+        }, index * 250); // Efeito máquina de escrever / digitação
+    });
+}
+
+// --- APIS DE INTEGRAÇÃO DA LOJA (ORQUESTRADA) ---
+
+async function fetchStoreCatalog() {
+    try {
+        const response = await fetch(`/api/store/catalog/${getSessionId()}`);
+        if (!response.ok) {
+            if (response.status === 403) {
+                return { isBanned: true };
+            }
+            throw new Error("Erro ao obter catálogo.");
+        }
+        return await response.json();
+    } catch (error) {
+        console.error("Erro no catálogo:", error);
+        return null;
+    }
+}
+
+async function buySkinOrchestrated(skinId) {
+    try {
+        const response = await fetch('/api/orchestrate/buy-skin', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                session_id: getSessionId(),
+                skin_id: skinId
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.logs) {
+            renderOrchestratorLogs(data.logs);
+        }
+        
+        return data;
+    } catch (error) {
+        console.error("Erro na compra orquestrada:", error);
+        return { status: "error", message: "Erro de rede ao conectar ao orquestrador." };
+    }
+}
+
+async function equipSkin(skinId) {
+    try {
+        const response = await fetch('/api/inventory/select', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                session_id: getSessionId(),
+                skin_id: skinId
+            })
+        });
+        return await response.json();
+    } catch (error) {
+        console.error("Erro ao equipar skin:", error);
+        return { status: "error" };
     }
 }
 
