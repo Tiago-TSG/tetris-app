@@ -465,3 +465,23 @@ function isHighScore(score, scoresList) {
 document.addEventListener('DOMContentLoaded', () => {
     fetchScores();
 });
+
+// Monitor de Erros Globais no Frontend integrado ao Cloud Logging via API do Backend
+window.addEventListener('error', (event) => {
+    // Evita loop se o próprio fetch de log falhar
+    if (event.filename && event.filename.includes('api.js') && event.message.includes('api/logs')) {
+        return;
+    }
+    fetch('/api/logs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            message: event.message || 'Erro desconhecido no frontend',
+            source: event.filename || 'unknown',
+            line: event.lineno || 0,
+            column: event.colno || 0,
+            stack: event.error ? event.error.stack : null,
+            session_id: typeof getSessionId === 'function' ? getSessionId() : null
+        })
+    }).catch(err => console.error('Erro ao enviar log para o backend:', err));
+});

@@ -170,14 +170,14 @@ class TestTetrisBackend(unittest.TestCase):
     def test_saga_buy_skin_success(self):
         """Testa a orquestração bem-sucedida de compra de skin."""
         session_id = "TEST_SAGA_OK"
-        # Inicializa carteira com saldo suficiente de 10000 moedas (gameboy custa 5000)
-        main.update_wallet_balance(session_id, 9000) # 1000 + 9000 = 10000
+        # Inicializa carteira com saldo suficiente de 15000 moedas (gameboy custa 10000)
+        main.update_wallet_balance(session_id, 14000) # 1000 + 14000 = 15000
         
         req = main.BuySkinOrchestratedRequest(session_id=session_id, skin_id="gameboy")
         res = main.orchestrator_buy_skin(req)
         
         self.assertEqual(res["status"], "success")
-        self.assertEqual(res["new_balance"], 5000) # De 10000 cobrou 5000
+        self.assertEqual(res["new_balance"], 5000) # De 15000 cobrou 10000
         
         # Verifica se o inventário tem a skin
         skins = main.get_unlocked_skins(session_id)
@@ -231,9 +231,9 @@ class TestTetrisBackend(unittest.TestCase):
         self.assertEqual(res["status"], "success")
         self.assertIn("Partida humana validada", res["message"])
         
-        # Verifica se ganhou moedas de recompensa (5000 / 10 = 500 moedas)
+        # Verifica se ganhou moedas de recompensa (100% do score = 5000 moedas)
         balance = main.get_wallet_balance(session_id)
-        self.assertEqual(balance, 1500) # 1000 inicial + 500 recompensa
+        self.assertEqual(balance, 6000) # 1000 inicial + 5000 recompensa
 
     def test_orchestrate_submit_score_robot_bans(self):
         """Testa se a orquestração detecta bot, bloqueia salvamento e bane a sessão."""

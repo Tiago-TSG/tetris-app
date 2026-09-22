@@ -7,6 +7,9 @@
 # ============================================================================
 main:
   params: [input]
+  options:
+    logging:
+      level: TRACE_ALL_CALLS
   steps:
     - init_variables:
         assign:

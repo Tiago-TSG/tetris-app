@@ -20,9 +20,110 @@ try:
 except Exception:
     firestore = MockFirestore
 
-# Configuração de logs
-logging.basicConfig(level=logging.INFO)
+# Custom formatter to produce structured JSON logs for GCP Cloud Logging
+class GCPJsonFormatter(logging.Formatter):
+    def format(self, record):
+        log_entry = {
+            "message": record.getMessage(),
+            "severity": record.levelname,
+            "timestamp": self.formatTime(record, self.datefmt),
+            "logger": record.name,
+            "filename": record.filename,
+            "lineno": record.lineno,
+        }
+        # Standard GCP Cloud Logging severity mapping
+        severity_map = {
+            "DEBUG": "DEBUG",
+            "INFO": "INFO",
+            "WARNING": "WARNING",
+            "ERROR": "ERROR",
+            "CRITICAL": "CRITICAL"
+        }
+        log_entry["severity"] = severity_map.get(record.levelname, "INFO")
+        
+        # Include extra fields (e.g. session_id, transaction_id, etc.)
+        standard_attrs = {
+            'args', 'asctime', 'created', 'exc_info', 'exc_text', 'filename',
+            'funcName', 'levelname', 'levelno', 'lineno', 'module',
+            'msecs', 'message', 'msg', 'name', 'pathname', 'process',
+            'processName', 'relativeCreated', 'stack_info', 'thread', 'threadName'
+        }
+        for key, value in record.__dict__.items():
+            if key not in standard_attrs:
+                log_entry[key] = value
+                
+        return json.dumps(log_entry, ensure_ascii=False)
+
+# Configuração do Logger Estruturado JSON
 logger = logging.getLogger(__name__)
+for handler in logger.handlers[:]:
+    logger.removeHandler(handler)
+
+stream_handler = logging.StreamHandler()
+stream_handler.setFormatter(GCPJsonFormatter())
+logger.addHandler(stream_handler)
+logger.setLevel(logging.INFO)
+logger.propagate = False
+
+# Inicialização segura do cliente GCP Cloud Monitoring (Métricas Personalizadas)
+monitoring_client = None
+project_name = None
+try:
+    from google.cloud import monitoring_v3
+    import google.auth
+    
+    # Auto-detecta o ID do projeto no GCP (funciona local com ADC ou no Cloud Run)
+    try:
+        _, monitoring_project_id = google.auth.default()
+    except Exception:
+        monitoring_project_id = os.getenv("GOOGLE_CLOUD_PROJECT")
+        
+    if monitoring_project_id:
+        monitoring_client = monitoring_v3.MetricServiceClient()
+        project_name = f"projects/{monitoring_project_id}"
+        logger.info(f"Cloud Monitoring client successfully initialized for project: {monitoring_project_id}")
+    else:
+        logger.warning("Could not auto-detect GCP project ID for Cloud Monitoring.")
+except Exception as e:
+    logger.warning(f"Could not initialize Cloud Monitoring Client: {e}. Metrics will be logged locally only.")
+
+def report_custom_metric(metric_type: str, value: float | int, labels: Dict[str, str] = None) -> None:
+    """Envia uma métrica customizada para o Google Cloud Monitoring ou loga localmente como fallback."""
+    metric_path = f"custom.googleapis.com/{metric_type}"
+    if monitoring_client is None or project_name is None:
+        logger.info(f"[Metric Fallback] {metric_path} -> value: {value}, labels: {labels}")
+        return
+    try:
+        from google.cloud import monitoring_v3
+        import time
+        
+        series = monitoring_v3.TimeSeries()
+        series.metric.type = metric_path
+        if labels:
+            for k, v in labels.items():
+                series.metric.labels[k] = str(v)
+                
+        series.resource.type = "global"
+        
+        point = monitoring_v3.Point()
+        if isinstance(value, int):
+            point.value.int64_value = value
+        else:
+            point.value.double_value = float(value)
+            
+        now = time.time()
+        seconds = int(now)
+        nanos = int((now - seconds) * 10**9)
+        interval = monitoring_v3.TimeInterval(
+            end_time={"seconds": seconds, "nanos": nanos}
+        )
+        point.interval = interval
+        series.points = [point]
+        
+        monitoring_client.create_time_series(name=project_name, time_series=[series])
+        logger.info(f"Metric {metric_path} successfully reported to Cloud Monitoring.")
+    except Exception as e:
+        logger.warning(f"Failed to write metric {metric_type} to Cloud Monitoring: {e}")
 
 app = FastAPI(title="Sophisticated Tetris Backend")
 
@@ -759,6 +860,31 @@ def get_achievements(session_id: str):
         logger.error(f"Error fetching achievements: {e}")
         return {"badges": []}
 
+# --- ENDPOINT DE REGISTRO DE LOGS DO FRONTEND ---
+class ClientLogPayload(BaseModel):
+    message: str
+    source: str | None = None
+    line: int | None = None
+    column: int | None = None
+    stack: str | None = None
+    session_id: str | None = None
+
+@app.post("/api/logs")
+def add_client_log(payload: ClientLogPayload):
+    """Recebe logs de erro do frontend e os envia para o Cloud Logging de forma estruturada."""
+    logger.error(
+        f"Frontend Error: {payload.message}",
+        extra={
+            "session_id": payload.session_id,
+            "source_file": payload.source,
+            "line_number": payload.line,
+            "column_number": payload.column,
+            "stack_trace": payload.stack,
+            "log_origin": "frontend"
+        }
+    )
+    return {"status": "logged"}
+
 # ============================================================================
 # MODERNIZAÇÃO: MODELOS DE DADOS PARA MICROSERVIÇOS ATÔMICOS
 # ============================================================================
@@ -927,8 +1053,20 @@ def api_accounts_ban(req: AccountBanRequest):
 def api_anti_cheat_analyze(req: AntiCheatRequest):
     """Executa o motor de análise de digitação com IA."""
     if req.is_bot_simulated:
-        return {"result": "Robot"}
-    classification = analyze_keystrokes_with_ml(req.keystrokes)
+        classification = "Robot"
+    else:
+        classification = analyze_keystrokes_with_ml(req.keystrokes)
+        
+    logger.info(
+        f"Anti-cheat analysis performed: {classification}",
+        extra={
+            "classification": classification,
+            "keystroke_count": len(req.keystrokes),
+            "is_bot_simulated": req.is_bot_simulated
+        }
+    )
+    report_custom_metric("tetris/anticheat/detections", 1, {"classification": classification})
+    
     return {"result": classification}
 
 # ============================================================================
@@ -978,9 +1116,28 @@ def orchestrator_buy_skin(req: BuySkinOrchestratedRequest):
     logs = []
     logs.append(f"[Workflows] Iniciando fluxo 'buy_skin_workflow' para a sessão {session_id}")
     
+    logger.info(
+        f"Starting SAGA buy skin workflow for session {session_id}, skin {skin_id}",
+        extra={
+            "session_id": session_id,
+            "skin_id": skin_id,
+            "transaction_id": transaction_id,
+            "saga_step": "init"
+        }
+    )
+    
     # Validações iniciais (Catálogo)
     if skin_id not in SKINS_CATALOG:
         logs.append(f"[Workflows] Erro: Skin '{skin_id}' não cadastrada no Catálogo.")
+        logger.warning(
+            f"SAGA buy skin failed: skin {skin_id} not in catalog",
+            extra={
+                "session_id": session_id,
+                "skin_id": skin_id,
+                "transaction_id": transaction_id,
+                "saga_step": "invalid_skin"
+            }
+        )
         raise HTTPException(status_code=400, detail={"message": "Skin inválida", "logs": logs})
         
     details = SKINS_CATALOG[skin_id]
@@ -989,6 +1146,15 @@ def orchestrator_buy_skin(req: BuySkinOrchestratedRequest):
     
     if skin_id in unlocked:
         logs.append(f"[Workflows] Erro: Usuário já possui a skin '{skin_id}'.")
+        logger.warning(
+            f"SAGA buy skin failed: skin {skin_id} already unlocked",
+            extra={
+                "session_id": session_id,
+                "skin_id": skin_id,
+                "transaction_id": transaction_id,
+                "saga_step": "already_owned"
+            }
+        )
         raise HTTPException(status_code=400, detail={"message": "Skin já adquirida", "logs": logs})
         
     # --- STEP 1: DEBITAR CARTEIRA ---
@@ -1001,9 +1167,29 @@ def orchestrator_buy_skin(req: BuySkinOrchestratedRequest):
     try:
         debit_res = api_wallet_debit(debit_payload)
         logs.append(f"[WalletService] Débito efetuado com sucesso! Saldo atualizado.")
+        logger.info(
+            f"SAGA Step 1: Wallet debit successful for {session_id}",
+            extra={
+                "session_id": session_id,
+                "skin_id": skin_id,
+                "transaction_id": transaction_id,
+                "amount_debited": price,
+                "saga_step": "debit_success"
+            }
+        )
     except HTTPException as e:
         logs.append(f"[WalletService] ERRO: Débito rejeitado (Código: {e.status_code}, Detalhe: {e.detail})")
         logs.append("[Workflows] Fluxo abortado antes de alterar inventário.")
+        logger.warning(
+            f"SAGA Step 1 Failed: Wallet debit rejected (code {e.status_code})",
+            extra={
+                "session_id": session_id,
+                "skin_id": skin_id,
+                "transaction_id": transaction_id,
+                "error_detail": e.detail,
+                "saga_step": "debit_failed"
+            }
+        )
         raise HTTPException(status_code=e.status_code, detail={"message": e.detail, "logs": logs})
         
     # --- STEP 2: ATIVAR INVENTÁRIO ---
@@ -1014,8 +1200,26 @@ def orchestrator_buy_skin(req: BuySkinOrchestratedRequest):
     try:
         unlock_res = api_inventory_unlock(unlock_payload)
         logs.append(f"[InventoryService] Skin '{skin_id}' adicionada ao inventário do jogador!")
+        logger.info(
+            f"SAGA Step 2: Inventory unlock successful for {session_id}",
+            extra={
+                "session_id": session_id,
+                "skin_id": skin_id,
+                "transaction_id": transaction_id,
+                "saga_step": "unlock_success"
+            }
+        )
     except HTTPException as e:
         logs.append(f"[InventoryService] ERRO CRÍTICO: Falha ao desbloquear skin no banco (Código: {e.status_code})")
+        logger.error(
+            f"SAGA Step 2 Failed: Inventory unlock failed (code {e.status_code}). Triggering rollback.",
+            extra={
+                "session_id": session_id,
+                "skin_id": skin_id,
+                "transaction_id": transaction_id,
+                "saga_step": "unlock_failed"
+            }
+        )
         
         # --- TRANSAÇÃO COMPENSATÓRIA (SAGA ROLLBACK) ---
         logs.append("[Workflows] Falha detectada no passo 2! Iniciando rollback da transação (SAGA Compensatória)...")
@@ -1026,11 +1230,32 @@ def orchestrator_buy_skin(req: BuySkinOrchestratedRequest):
             api_wallet_credit(credit_payload)
             logs.append(f"[WalletService] Reembolso de {price} moedas creditado com sucesso!")
             logs.append("[Workflows] SAGA compensação executada. Dinheiro devolvido. Transação desfeita de forma consistente.")
+            logger.info(
+                f"SAGA Rollback: Wallet successfully refunded for {session_id}",
+                extra={
+                    "session_id": session_id,
+                    "skin_id": skin_id,
+                    "transaction_id": transaction_id,
+                    "saga_step": "rollback_success"
+                }
+            )
+            report_custom_metric("tetris/store/skins_sold", 1, {"skin_id": skin_id, "status": "rolled_back"})
         except Exception as err:
             # DLQ (Dead Letter Queue) caso o rollback também falhe!
             logs.append(f"[WalletService] ERRO CRÍTICO COMPLEMENTAR: Falha catastrófica ao reembolsar jogador!")
             logs.append(f"[Workflows] !!! REDIRECIONANDO ERRO PARA SAGA-DLQ (Dead Letter Queue do Pub/Sub) !!!")
             logs.append(f"[Workflows] ID de rastreamento salvo na DLQ: {transaction_id}-DLQ-ERROR")
+            logger.critical(
+                f"SAGA CRITICAL FAILURE: SAGA rollback failed! Routing to DLQ.",
+                extra={
+                    "session_id": session_id,
+                    "skin_id": skin_id,
+                    "transaction_id": transaction_id,
+                    "error_detail": str(err),
+                    "saga_step": "dlq_error"
+                }
+            )
+            report_custom_metric("tetris/store/skins_sold", 1, {"skin_id": skin_id, "status": "dlq_error"})
             return {
                 "status": "dlq_error",
                 "message": "Erro gravíssimo! A transação de compensação falhou e o incidente foi salvo na DLQ.",
@@ -1044,6 +1269,7 @@ def orchestrator_buy_skin(req: BuySkinOrchestratedRequest):
         }
         
     logs.append("[Workflows] Fluxo 'buy_skin_workflow' executado com 100% de sucesso!")
+    report_custom_metric("tetris/store/skins_sold", 1, {"skin_id": skin_id, "status": "success"})
     return {
         "status": "success",
         "message": "Skin desbloqueada e comprada!",
@@ -1062,11 +1288,31 @@ def orchestrator_submit_score(req: ScoreOrchestratedRequest):
     
     logs.append(f"[Workflows] Iniciando fluxo 'submit_score_workflow' para o jogador '{req.name}'")
     
+    logger.info(
+        f"Starting submit score workflow for player {req.name}, session {session_id}",
+        extra={
+            "session_id": session_id,
+            "player_name": req.name,
+            "score": req.score,
+            "level": req.level,
+            "lines": req.lines
+        }
+    )
+    
     # --- STEP 1: CONSULTAR BANIMENTO ---
     logs.append("[Workflows] Executando consulta HTTP GET -> /api/accounts/status")
     if is_session_banned(session_id):
         logs.append(f"[AccountService] REJEITADO: A sessão '{session_id}' foi identificada como BANIDA por fraude.")
         logs.append("[Workflows] Bloqueando fluxo. Scoreboard ignorado.")
+        logger.warning(
+            f"Score submission blocked: session {session_id} is already banned",
+            extra={
+                "session_id": session_id,
+                "player_name": req.name,
+                "score": req.score,
+                "decision": "blocked"
+            }
+        )
         raise HTTPException(status_code=403, detail={"message": "Usuário banido permanentemente.", "logs": logs})
         
     # --- STEP 2: CLASSIFICAÇÃO DE IA ANTI-CHEAT ---
@@ -1087,6 +1333,17 @@ def orchestrator_submit_score(req: ScoreOrchestratedRequest):
         api_accounts_ban(ban_payload)
         
         logs.append("[Workflows] Placar de trapaça descartado. Conta banida da infraestrutura.")
+        logger.warning(
+            f"Score submission rejected for session {session_id}: Classified as Robot. Session banned.",
+            extra={
+                "session_id": session_id,
+                "player_name": req.name,
+                "score": req.score,
+                "classification": "Robot",
+                "decision": "ban"
+            }
+        )
+        report_custom_metric("tetris/game/scores_submitted", 1, {"status": "banned"})
         return {
             "status": "banned",
             "message": "Uso de Auto-Bot/Cheat detectado pela IA! Sua sessão foi banida permanentemente.",
@@ -1113,6 +1370,17 @@ def orchestrator_submit_score(req: ScoreOrchestratedRequest):
         update_wallet_balance(session_id, coins_reward)
         
         logs.append("[Workflows] Fluxo 'submit_score_workflow' finalizado com sucesso!")
+        logger.info(
+            f"Score submission successful for human player {req.name}, session {session_id}",
+            extra={
+                "session_id": session_id,
+                "player_name": req.name,
+                "score": req.score,
+                "classification": "Human",
+                "decision": "publish"
+            }
+        )
+        report_custom_metric("tetris/game/scores_submitted", 1, {"status": "success"})
         return {
             "status": "success",
             "message": "Partida humana validada! Pontuação gravada e moedas creditadas.",
@@ -1150,15 +1418,18 @@ def get_scores():
             
             if cache_doc.exists:
                 logger.info("Retornando scores do cache otimizado.")
+                report_custom_metric("tetris/db/cache_hits", 1, {"source": "cache"})
                 return cache_doc.to_dict().get("top_10", [])
             else:
                 logger.warning("Cache não encontrado. Fazendo fallback para query pesada e leitura local.")
+                report_custom_metric("tetris/db/cache_hits", 1, {"source": "query_fallback"})
                 # Fallback caso a Cloud Function ainda não tenha criado o cache
                 scores = load_scores_from_firestore()
                 return sorted(scores, key=lambda x: x["score"], reverse=True)[:10]
                 
         except Exception as e:
             logger.error(f"Erro ao ler do cache do Firestore: {e}")
+            report_custom_metric("tetris/db/cache_hits", 1, {"source": "query_fallback"})
             scores = load_scores_from_firestore()
             return sorted(scores, key=lambda x: x["score"], reverse=True)[:10]
     else:
