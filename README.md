@@ -78,6 +78,12 @@ A arquitetura atingiu maturidade de nível corporativo ao introduzir uma esteira
 8. **Implantação Contínua Automatizada (CD):** Publicação automatizada da imagem segura no Artifact Registry, deploy automático para o Cloud Run e deploy imediato dos workflows de orquestração do GCP Workflows.
 9. **Varredura Dinâmica Ativa Sob Demanda (DAST - OWASP ZAP):** Pipeline isolada (`dast.yml`) executável de forma manual e segura que realiza simulações de ataques de injeção em um ambiente efêmero local, gerando relatórios dinâmicos completos.
 
+### 🎓 Adequação para o Projeto Final (Unificação e Promoção para `tetris-app`)
+Para a entrega consolidada do **Projeto Final**, toda a evolução histórica e as tecnologias desenvolvidas do **Checkpoint 01 ao Checkpoint 05** foram unificadas em um único repositório limpo.
+* **Promoção de Nome (Adequação de Produção):** O serviço de deploy e as referências foram promovidos de `tetris-app-checkpoint-05` para o nome final de produção unificado **`tetris-app`**, garantindo uma identidade limpa e profissional no console do Google Cloud Platform (Cloud Run, Workflows e Pub/Sub).
+* **Portabilidade de Ferramentas:** Os scripts locais de desenvolvimento (`gen_music.py` e `replace_script.py`) foram atualizados de caminhos locais absolutos para caminhos relativos (`static/js/game.js`), tornando o projeto totalmente autocontido, portátil e executável em qualquer ambiente local.
+* **Histórico Preservado:** Todo o histórico de evolução do Git de cada uma das fases anteriores foi perfeitamente sequenciado de forma linear, garantindo a rastreabilidade total do desenvolvimento acadêmico.
+
 ---
 
 ## 🛠️ Arquitetura do Projeto
@@ -203,6 +209,117 @@ Como as melhores práticas de mercado desaconselham rodar testes dinâmicos pesa
 
 ---
 
+## 🔐 Segurança, IAM & Workload Identity Federation (WIF)
+
+Uma das maiores inovações arquiteturais a partir do **Checkpoint 05** foi a eliminação completa das chaves de segurança estáticas (`JSON` ou `P12`) para autenticação das esteiras de CI/CD no Google Cloud. Em vez disso, o projeto adota o modelo **Zero Trust** baseado no **GCP Workload Identity Federation (WIF)**.
+
+### 👥 Como Funciona o WIF?
+O GitHub Actions e o GCP estabelecem uma relação de confiança federada por meio de um **OIDC Provider** (OpenID Connect). No momento do deploy:
+1. O GitHub Actions solicita um token JWT assinado digitalmente pelo próprio GitHub.
+2. Esse token é enviado ao GCP, que valida a assinatura do GitHub e verifica se a esteira pertence a um repositório autorizado (restrito estritamente a `Tiago-TSG/tetris-app`).
+3. Uma vez validado, o GCP gera credenciais de acesso de curta duração (máximo de 1 hora) para que o Runner assuma o papel da conta de serviço (`Service Account`) de forma 100% segura e temporária, sem expor nenhuma chave secreta a vazamentos de código.
+
+---
+
+### 🛡️ Matriz de Permissões IAM (Princípio do Privilégio Mínimo)
+
+Para garantir segurança operacional e rastreabilidade, dividimos os privilégios em duas categorias de identidades:
+
+#### A. Conta de Serviço do Deploy (`github-deployer`)
+Esta é a identidade temporária que o GitHub Actions assume via WIF para realizar o empacotamento, escaneamento e deploy na nuvem. Ela exige as seguintes permissões a nível de projeto:
+
+| Papel IAM (Role) | Motivo da Concessão |
+| :--- | :--- |
+| `roles/artifactregistry.admin` | Necessário para ler, criar repositórios e enviar as imagens Docker geradas (SCA) no GAR. |
+| `roles/run.admin` | Permite criar, gerenciar versões e configurar as rotas e portas do serviço no Cloud Run. |
+| `roles/workflows.admin` | Necessário para fazer o deploy automatizado dos fluxos de orquestração SAGA (Workflows). |
+| `roles/iam.serviceAccountUser` | Autoriza a esteira a atribuir a identidade de execução à instância do Cloud Run no GCP. |
+
+#### B. Conta de Serviço de Execução do Aplicativo (Runtime)
+Esta é a identidade que o **Cloud Run** assume quando o contêiner está rodando no GCP. Ela **não** precisa de privilégios de deploy, apenas de permissões para se comunicar com as APIs internas necessárias para o funcionamento do Tetris:
+
+| Papel IAM (Role) | Recurso Destino | Motivo da Concessão |
+| :--- | :--- | :--- |
+| `roles/datastore.user` | Cloud Firestore | Permitir que o backend Python leia e grave pontuações e compras de skins diretamente no Firestore. |
+| `roles/pubsub.publisher` | Tópicos Pub/Sub | Necessário para publicar os eventos de pontuação (`scores-topic`) e telemetria (`telemetry-topic`). |
+
+#### C. Conta de Serviço do Cloud Workflows (Orquestração)
+Identidade assumida pelo motor de Workflows do GCP para executar as transações distribuídas (Compra de Skin e Envio de Score):
+
+| Papel IAM (Role) | Recurso Destino | Motivo da Concessão |
+| :--- | :--- | :--- |
+| `roles/run.invoker` | Cloud Run | Permite ao motor de workflows autenticar e chamar de forma segura os webhooks internos da API do Tetris. |
+| `roles/logging.logWriter` | Cloud Logging | Autoriza a orquestração a gravar logs detalhados de cada etapa SAGA para auditoria e tracing. |
+
+---
+
+### 🛠️ Guia de Inicialização e Permissões via gcloud CLI
+
+Para reproduzir este ambiente seguro do zero em outro projeto GCP, você pode executar os comandos genéricos a seguir instalando as permissões e a federação WIF:
+
+#### 1. Criar e Configurar o Workload Identity Federation (WIF)
+Execute os comandos abaixo para criar o pool de conexões e o provedor OIDC integrado ao GitHub:
+
+```bash
+# 1. Criar o Pool de Identidades
+gcloud iam workload-identity-pools create github-actions-pool \
+    --location="global" \
+    --display-name="GitHub Actions Pool" \
+    --project="ID_DO_SEU_PROJETO"
+
+# 2. Criar o Provedor OIDC para o GitHub
+gcloud iam workload-identity-pools providers create-oidc github-actions-provider \
+    --workload-identity-pool="github-actions-pool" \
+    --location="global" \
+    --display-name="GitHub Actions Provider" \
+    --issuer-uri="https://token.actions.githubusercontent.com" \
+    --attribute-mapping="google.subject=assertion.sub,attribute.repository=assertion.repository,attribute.actor=assertion.actor" \
+    --attribute-condition="assertion.repository == 'SEU_USUARIO_GITHUB/SEU_REPOSITORIO_GITHUB'" \
+    --project="ID_DO_SEU_PROJETO"
+```
+
+#### 2. Configurar a Service Account do Deployer (`github-deployer`)
+Crie a Service Account e conceda acesso WIF para o seu repositório, seguido dos papéis de deploy:
+
+```bash
+# 1. Criar a Service Account do Deploy
+gcloud iam service-accounts create github-deployer \
+    --display-name="GitHub Actions CD Deployer" \
+    --project="ID_DO_SEU_PROJETO"
+
+# 2. Vincular a Service Account ao WIF (Autorizar o repositório específico a personificá-la)
+gcloud iam service-accounts add-iam-policy-binding github-deployer@ID_DO_SEU_PROJETO.iam.gserviceaccount.com \
+    --project="ID_DO_SEU_PROJETO" \
+    --role="roles/iam.workloadIdentityUser" \
+    --member="principalSet://iam.googleapis.com/projects/NUMERO_DO_SEU_PROJETO/locations/global/workloadIdentityPools/github-actions-pool/attribute.repository/SEU_USUARIO_GITHUB/SEU_REPOSITORIO_GITHUB"
+
+# 3. Conceder permissões de deployer a nível de projeto
+for ROLE in artifactregistry.admin run.admin workflows.admin iam.serviceAccountUser; do
+  gcloud projects add-iam-policy-binding "ID_DO_SEU_PROJETO" \
+      --member="serviceAccount:github-deployer@ID_DO_SEU_PROJETO.iam.gserviceaccount.com" \
+      --role="roles/$ROLE"
+done
+```
+
+#### 3. Configurar Permissões de Runtime (Cloud Run e Workflows)
+Conceda às contas de serviço que rodarão o contêiner e a saga de workflows apenas as permissões essenciais de execução:
+
+```bash
+# 1. Permitir que o Cloud Run acesse o Firestore e Pub/Sub (Substitua EMAIL_SA_CLOUD_RUN)
+for ROLE in datastore.user pubsub.publisher; do
+  gcloud projects add-iam-policy-binding "ID_DO_SEU_PROJETO" \
+      --member="serviceAccount:EMAIL_SA_CLOUD_RUN" \
+      --role="roles/$ROLE"
+done
+
+# 2. Permitir que o Cloud Workflows invoque as rotas internas da API do Cloud Run (Substitua EMAIL_SA_WORKFLOWS)
+gcloud projects add-iam-policy-binding "ID_DO_SEU_PROJETO" \
+    --member="serviceAccount:EMAIL_SA_WORKFLOWS" \
+    --role="roles/run.invoker"
+```
+
+---
+
 ## 🖥️ Como Executar Localmente (Ambiente Virtual)
 
 Siga os passos abaixo para preparar seu ambiente Python, instalar as dependências necessárias e inicializar o jogo em seu navegador.
@@ -211,8 +328,8 @@ Siga os passos abaixo para preparar seu ambiente Python, instalar as dependênci
 Primeiro, clone o repositório para a sua máquina local e acesse a pasta do projeto:
 
 ```bash
-git clone https://github.com/Tiago-TSG/tetris-app-checkpoint-05.git
-cd tetris-app-checkpoint-05
+git clone https://github.com/Tiago-TSG/tetris-app.git
+cd tetris-app
 ```
 
 ### Passo 2: Criar o Ambiente Virtual (`venv`)
@@ -275,22 +392,22 @@ Este projeto possui suporte a contêineres Docker, o que permite rodar toda a ap
 Primeiro, clone o repositório para a sua máquina local e acesse a pasta do projeto:
 
 ```bash
-git clone https://github.com/Tiago-TSG/tetris-app-checkpoint-05.git
-cd tetris-app-checkpoint-05
+git clone https://github.com/Tiago-TSG/tetris-app.git
+cd tetris-app
 ```
 
 ### Passo 2: Construir a Imagem Docker
 No diretório raiz (onde está o arquivo `Dockerfile`), construa a imagem executando:
 
 ```bash
-docker build -t tetris-app-checkpoint-05 .
+docker build -t tetris-app .
 ```
 
 ### Passo 3: Executar o Contêiner Localmente
 Inicialize o contêiner mapeando a porta interna `8080` para a porta `8080` do seu computador local:
 
 ```bash
-docker run -p 8080:8080 tetris-app-checkpoint-05
+docker run -p 8080:8080 tetris-app
 ```
 
 Acesse o jogo no navegador através do endereço local **`http://localhost:8080`**.
@@ -307,8 +424,8 @@ O **Google Cloud Run** é um serviço totalmente gerenciado do GCP que executa c
 3. Ter um projeto criado no GCP e habilitar o faturamento (Billing) e as APIs do Cloud Build e Cloud Run.
 4. Clonar este repositório Git em sua máquina local e acessar o diretório do projeto:
    ```bash
-   git clone https://github.com/Tiago-TSG/tetris-app-checkpoint-05.git
-   cd tetris-app-checkpoint-05
+   git clone https://github.com/Tiago-TSG/tetris-app.git
+   cd tetris-app
    ```
 
 ### 1. Criar os Tópicos do Pub/Sub
@@ -335,7 +452,7 @@ A forma mais rápida e simples de fazer o deploy no Cloud Run é usando o build 
 
 3.  Execute o comando de deploy. Ele criará a imagem e a colocará em execução:
     ```bash
-    gcloud run deploy tetris-app-checkpoint-05 \
+    gcloud run deploy tetris-app \
       --source . \
       --region us-central1 \
       --allow-unauthenticated
@@ -345,7 +462,7 @@ A forma mais rápida e simples de fazer o deploy no Cloud Run é usando o build 
     
     *(Você pode alterar a região se desejar, como `southamerica-east1` para o Brasil).*
 
-4.  Ao final do processo, a CLI do gcloud exibirá a **URL pública do jogo** (ex: `https://tetris-app-checkpoint-05-xxxxx-us-central1.run.app`) no serviço "Cloud Run".
+4.  Ao final do processo, a CLI do gcloud exibirá a **URL pública do jogo** (ex: `https://tetris-app-xxxxx-us-central1.run.app`) no serviço "Cloud Run".
 
 ### 2. Configurar as Assinaturas de Push (Webhooks)
 Para fechar o ciclo do Pub/Sub, vincule os tópicos criados aos Webhooks da sua aplicação, substituindo a URL abaixo pela URL gerada no passo anterior:
@@ -382,13 +499,13 @@ Se você preferir construir a imagem manualmente e enviá-la para um repositóri
 2.  **Construir a imagem e enviá-la para o GCP via Cloud Build:**
     Substitua `PROJECT_ID` pelo ID real do seu projeto.
     ```bash
-    gcloud builds submit --tag us-central1-docker.pkg.dev/PROJECT_ID/neon-arcade-repo/tetris-app-checkpoint-05:latest .
+    gcloud builds submit --tag us-central1-docker.pkg.dev/PROJECT_ID/neon-arcade-repo/tetris-app:latest .
     ```
 
 3.  **Realizar o deploy do container armazenado no registro para o Cloud Run:**
     ```bash
     gcloud run deploy retro-neon-tetris \
-      --image us-central1-docker.pkg.dev/PROJECT_ID/neon-arcade-repo/tetris-app-checkpoint-05:latest \
+      --image us-central1-docker.pkg.dev/PROJECT_ID/neon-arcade-repo/tetris-app:latest \
       --region us-central1 \
       --allow-unauthenticated
     ```
