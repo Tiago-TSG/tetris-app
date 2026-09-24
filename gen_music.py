@@ -168,7 +168,7 @@ out = out.rstrip(",\n") + "\n        };"
 
 
 import os
-filepath = "/home/tiago/estudos/puc-minas/serverless-computing-and-arquiteturas-event-driven/checkpoint-03/static/js/game.js"
+filepath = "static/js/game.js"
 with open(filepath, "r") as f:
     content = f.read()
 
