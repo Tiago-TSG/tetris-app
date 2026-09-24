@@ -2,7 +2,7 @@
 
 Uma versão moderna, estilosa e extremamente sofisticada do clássico jogo **Tetris**, projetada com visual retro-wave/neon (Synthwave) e **Sintetizador de Áudio Procedural** nativo no navegador (usando a Web Audio API).
 
-Esta versão (**Checkpoint 05**) consolida a **Automação DevSecOps** com uma pipeline completa de CI/CD via GitHub Actions e portões robustos de segurança e qualidade. O projeto herda e aprimora a **Arquitetura baseada em Microserviços e Orquestração Avançada (Saga Pattern & Decision Trees - Checkpoint 03)** e a **Instrumentação e Observabilidade Nativa no GCP (Cloud Logging & Cloud Monitoring - Checkpoint 04)**, agregando ferramentas automáticas de SAST (Bandit), SCA (Trivy), detecção de segredos (Gitleaks), conformidade sintática (ESLint, Ruff, Hadolint), testes unitários contínuos e implantação contínua segura via WIF no Google Cloud Run.
+Esta versão unificada (**Projeto Final**) consolida toda a evolução técnica da aplicação, unindo a **Arquitetura baseada em Microserviços e Orquestração Avançada (SAGA Pattern)**, a **Instrumentação e Observabilidade Nativa no GCP** e a **Automação DevSecOps** com uma pipeline completa de CI/CD via GitHub Actions e portões estritos de segurança e qualidade. O projeto agrega ferramentas automáticas de SAST (Bandit), SCA (Trivy), detecção de segredos (Gitleaks), conformidade sintática (ESLint, Ruff, Hadolint), testes unitários contínuos e implantação contínua segura via WIF no Google Cloud Run.
 
 ## 🎨 Interface do Jogo
 
@@ -53,7 +53,7 @@ O sistema monolítico foi refatorado e expandido adotando padrões modernos de o
 4. **Terminal Maestro e UI Didática:** Introdução de um console interativo estilo hacker no front-end para visualizar a orquestração em tempo real.
 5. **Engine de Áudio Expandida:** Sintetizador turbinado de 1 para 6 oitavas de cobertura (C2 a B7), com script matemático para compilar clássicos (Senhor dos Anéis em BPM perfeito, Star Wars, Pink Panther) renderizados no Web Audio API nativo.
 
-### Fase 5: Observabilidade e Instrumentação no GCP (Checkpoint 04)
+### Fase 5: Observabilidade e Instrumentação no GCP
 A arquitetura evoluiu para contemplar governança e confiabilidade corporativas completas, introduzindo instrumentação nativa do Google Cloud de ponta a ponta (Logs, Métricas e Traces):
 1. **Logs Estruturados em JSON (Cloud Logging):** O logger padrão do backend em Python foi modificado para utilizar uma classe customizada `GCPJsonFormatter`. Todos os registros de log agora são impressos em streams de saída estruturados em JSON no formato esperado pelo GCP, injetando automaticamente campos como `severity`, `session_id`, `saga_step`, `transaction_id` e metadados de execução.
 2. **Métricas Personalizadas (Cloud Monitoring):** Integração segura com o SDK do Google Cloud Monitoring para emitir métricas personalizadas de negócio e infraestrutura de forma assíncrona, incluindo:
@@ -66,7 +66,7 @@ A arquitetura evoluiu para contemplar governança e confiabilidade corporativas 
 5. **Agregação de Erros de Frontend:** Implementação de um monitor global de erros em JS (`window.addEventListener('error')`) que reporta automaticamente exceções ocorridas no navegador do jogador para o endpoint `/api/logs` do backend, centralizando os erros de frontend no GCP Error Reporting.
 6. **Resiliência e Fallback Local:** O código foi projetado de forma defensiva para auto-detectar o ambiente. Se as bibliotecas do GCP não puderem se conectar ao barramento na nuvem (como no desenvolvimento local), o sistema chaveia automaticamente para impressão local formatada, garantindo testes locais perfeitamente offline.
 
-### Fase 6: Automação DevSecOps e Pipeline Integrada (Checkpoint 05 - Atual)
+### Fase 6: Automação DevSecOps e Pipeline Integrada
 A arquitetura atingiu maturidade de nível corporativo ao introduzir uma esteira automatizada de Integração, Qualidade, Segurança e Entrega Contínuas (CI/CD) via GitHub Actions, garantindo que nenhum código seja implantado sem passar por rigorosos portões de qualidade (Quality Gates):
 1. **Varredura Estática de Segredos (Gitleaks):** Análise automatizada de todo o histórico de commits para detecção preventiva de chaves de API, senhas ou tokens expostos.
 2. **Qualidade e Estilo de Código (Ruff & ESLint):** Linting automatizado de Python com Ruff (ultrarrápido) e de JavaScript (Flat Config `eslint.config.mjs`) para manter os padrões e a legibilidade do código.
@@ -89,6 +89,13 @@ Para a entrega consolidada do **Projeto Final**, toda a evolução histórica e 
 ## 🛠️ Arquitetura do Projeto
 
 ```text
+├── .github/                   # Configurações do GitHub (Actions e Workflows)
+│   ├── actions/
+│   │   └── gemini-troubleshoot/
+│   │       └── action.yml     # Action customizada de diagnóstico com IA Gemini
+│   └── workflows/
+│       ├── dast.yml           # Pipeline de testes dinâmicos de segurança (OWASP ZAP)
+│       └── pipeline.yml       # Pipeline principal DevSecOps (Lint, SAST, CI/CD, SCA)
 ├── backend/
 │   ├── main.py                # Servidor FastAPI com APIs atômicas, CQRS, Maestro Simulador e Webhooks
 │   ├── requirements.txt       # Dependências de bibliotecas Python
@@ -102,9 +109,17 @@ Para a entrega consolidada do **Projeto Final**, toda a evolução histórica e 
 │   └── index.html             # Esqueleto da página e modais (Loja, Placar, Terminal Maestro)
 ├── buy_skin_workflow.yaml     # Definição do fluxo orquestrado da loja (Saga, Retries, Rollback)
 ├── submit_score_workflow.yaml # Definição da Árvore de Decisão do Anti-Cheat e gravação
+├── gen_music.py               # Script local de geração procedural de melodias matemáticas
+├── generate_freqs.py          # Script utilitário para calcular frequências das notas musicais
+├── generate_melodies.py       # Script utilitário para estruturar melodias em arrays JSON
+├── replace_script.py          # Script de injeção automática de melodias no game.js
+├── freqs.json                 # Banco de dados local das frequências calculadas de notas
+├── new_melodies.js            # Melodias geradas temporárias para validação
 ├── Dockerfile                 # Instruções de montagem da imagem Docker (Cloud Run)
 ├── .dockerignore              # Exclusão de arquivos desnecessários na imagem Docker
 ├── .gitignore                 # Exclusão de arquivos de versionamento e venv
+├── .trivyignore               # Exceções de vulnerabilidade de pacotes upstream homologadas
+├── tetris-app.jpg             # Captura de tela da interface do jogo
 └── README.md                  # Esta documentação completa do projeto
 ```
 
@@ -198,20 +213,31 @@ O job de Deploy é acionado apenas quando há uma inserção (push) direta na br
 ### 🛡️ Testes de Invasão Ativos e Dinâmicos (DAST com OWASP ZAP)
 Como as melhores práticas de mercado desaconselham rodar testes dinâmicos pesados e invasivos de DAST em cada pequeno push diário (para economizar recursos e evitar poluição de dados no banco com payloads de teste), o projeto introduz uma **pipeline de DAST separada e sob demanda** configurada em `.github/workflows/dast.yml`.
 
-* **Como Funciona:**
-  1. O pipeline é ativado manualmente pelo painel **Actions** do GitHub (**Workflow Dispatch**).
-  2. Ele clona o repositório e compila a imagem Docker do jogo localmente no Runner temporário do GitHub.
-  3. Inicializa o container da aplicação em background.
-  4. Extrai dinamicamente o IP interno do container na rede interna do Docker para garantir conexões de rede 100% resilientes e isoladas.
-  5. Sobe o container oficial do **OWASP ZAP** e dispara um **Baseline Scan** contra o endereço IP interno do app, simulando ataques de injeção e testando a segurança da porta `8080` (como cabeçalhos ausentes ou cookies inseguros).
-  6. Gera e anexa um relatório completo de vulnerabilidades dinâmicas em formato HTML diretamente no painel do GitHub Actions.
-  7. Finaliza e destrói o container de testes, sem nunca expor ou poluir a infraestrutura de produção no GCP.
+#### 📊 Estrutura Geral do Pipeline de DAST (Fluxo Isolado e Efêmero)
+Diferente da pipeline de DevSecOps que possui um fluxo de CD automático acoplado, a esteira de DAST funciona em um modelo de **caixa preta (Black-Box Testing)** de ciclo de vida curto, isolado na infraestrutura local do runner do GitHub Actions:
+
+```text
+┌────────────────────────┐      ┌────────────────────────┐      ┌────────────────────────┐      ┌────────────────────────┐
+│ 1. CHECKOUT & DOCKER   │ ───► │  2. CONTAINER SANDBOX   │ ───► │ 3. OWASP ZAP ACTIVE    │ ───► │ 4. RELATÓRIO HTML &    │
+│      BUILD             │      │     INITIALIZATION     │      │     BASELINE SCAN      │      │       DESTRUIÇÃO       │
+│ (Clona o repositório,  │      │ (Inicializa o app,     │      │ (Simulação de ataques, │      │ (Publica o artefato,   │
+│  compila imagem local) │      │  extrai IP de rede)    │      │  auditoria de portas)  │      │  destrói container)    │
+└────────────────────────┘      └────────────────────────┘      └────────────────────────┘      └────────────────────────┘
+```
+
+#### 🔍 Como Funciona o Processo de Auditoria Dinâmica:
+1. **Ativação Manual Segura (Workflow Dispatch):** O pipeline é disparado sob demanda através do painel **Actions** do GitHub, dando ao time de segurança total controle sobre quando auditar a aplicação.
+2. **Ambiente Sandbox Isolado (Zero Side-Effects):** O Runner do GitHub clona o código e compila o container da aplicação localmente. O aplicativo é inicializado em segundo plano (background) em uma rede virtual Docker isolada. Isso garante que nenhum dado de produção no GCP (Firestore ou Pub/Sub) seja poluído com os payloads de ataque do scanner.
+3. **Extração Dinâmica de Rede:** O script de automação extrai em tempo real o endereço IP interno do container na rede local do Runner. Isso evita expor portas para o tráfego externo público e garante conexões 100% resilientes e seguras.
+4. **Varredura Ativa do OWASP ZAP:** Um segundo container oficial do **OWASP ZAP** é inicializado na mesma rede virtual e executa um **Baseline Scan** completo contra a porta `8080` do aplicativo. Ele simula ativamente ataques de injeção, analisa cabeçalhos de segurança ausentes, vulnerabilidades de XSS (Cross-Site Scripting), segurança de cookies e possíveis brechas catalogadas no OWASP Top 10.
+5. **Geração e Publicação de Artefatos:** O relatório completo de auditoria dinâmica é compilado nos formatos **HTML** e **Markdown**, sendo anexado diretamente como um artefato de download na página da execução do workflow do GitHub Actions.
+6. **Limpeza e Encerramento:** Ao final da varredura, os containers temporários e as redes são totalmente destruídos, mantendo o ambiente do runner limpo e seguro de forma imediata.
 
 ---
 
 ## 🔐 Segurança, IAM & Workload Identity Federation (WIF)
 
-Uma das maiores inovações arquiteturais a partir do **Checkpoint 05** foi a eliminação completa das chaves de segurança estáticas (`JSON` ou `P12`) para autenticação das esteiras de CI/CD no Google Cloud. Em vez disso, o projeto adota o modelo **Zero Trust** baseado no **GCP Workload Identity Federation (WIF)**.
+Uma das maiores inovações arquiteturais na fase de **Automação DevSecOps** foi a eliminação completa das chaves de segurança estáticas (`JSON` ou `P12`) para autenticação das esteiras de CI/CD no Google Cloud. Em vez disso, o projeto adota o modelo **Zero Trust** baseado no **GCP Workload Identity Federation (WIF)**.
 
 ### 👥 Como Funciona o WIF?
 O GitHub Actions e o GCP estabelecem uma relação de confiança federada por meio de um **OIDC Provider** (OpenID Connect). No momento do deploy:
