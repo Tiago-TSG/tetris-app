@@ -121,6 +121,7 @@ Para a entrega consolidada do **Projeto Final**, toda a evolução histórica e 
 ├── .gitignore                 # Exclusão de arquivos de versionamento e venv
 ├── .trivyignore               # Exceções de vulnerabilidade de pacotes upstream homologadas
 ├── tetris-app.jpg             # Captura de tela da interface do jogo
+├── ai_report.png              # Captura de tela do relatório de diagnóstico emitido pelo Gemini
 └── README.md                  # Esta documentação completa do projeto
 ```
 
@@ -205,6 +206,90 @@ Enquanto o usuário está jogando, o frontend emite dados em background (taxa de
 Toda a infraestrutura se beneficia de um ciclo fechado de observabilidade estruturada:
 *   **Traces Distribuídos:** Cada requisição do jogador gera um ID de trace único (`X-Cloud-Trace-Context`) que é propagado pelo Cloud Run, Pub/Sub e Workflows. Isso permite gerar gráficos de Gantt no **Cloud Trace** para identificar gargalos em microsegundos.
 *   **Logs Estruturados:** Logs de erro do frontend (capturados via `window.onerror`) e logs estruturados em JSON do backend são integrados no **Cloud Logging** e agregados diretamente no **GCP Error Reporting** para alertas proativos em tempo real.
+
+---
+
+## 🤖 Inteligência Artificial no Projeto
+
+A Inteligência Artificial é integrada ao **Retro Neon Tetris** em duas frentes distintas, complementares e altamente sofisticadas, elevando a aplicação ao patamar de um sistema inteligente moderno:
+
+### 🧠 Os Dois Pilares de IA do Sistema
+
+#### 1. IA Generativa: Agente Autônomo de Troubleshooting (Google Gemini 1.5 Flash)
+*   **Contexto:** Integrado à esteira de **DevSecOps (GitHub Actions)**.
+*   **Funcionamento:** Quando ocorre uma falha em qualquer portão de qualidade (Lint, SAST, Testes ou Build), a Action customizada `.github/actions/gemini-troubleshoot` é disparada. O agente extrai os logs da CLI do GitHub (`gh run view --log-failed`), detecta automaticamente a causa raiz e gera um diagnóstico com sugestões precisas de patches de código no próprio console da pipeline, economizando tempo precioso de debugging.
+
+![Relatório do Agente de IA no Console do Actions](ai_report.png)
+
+*Exemplo de relatório dinâmico emitido de forma autônoma pela API do Gemini ao detectar falhas em etapas lógicas do repositório.*
+
+#### 2. IA Heurística: Motor de Detecção de Padrões e Anti-Cheat (Keystroke Dynamics)
+*   **Contexto:** Integrado ao **Runtime de Produção** e orquestrado via **Google Cloud Workflows**.
+*   **Funcionamento:** Monitora continuamente a telemetria comportamental do usuário em milissegundos. Ao submeter uma pontuação, a heurística calcula o desvio padrão dos intervalos das teclas. Se o desvio for nulo ou menor que `5ms` (padrão de bots/macros ou injeções diretas de API), o sistema barra o score e bane o ID de sessão de forma assíncrona.
+
+---
+
+### 🚦 Fluxo da Árvore de Decisão do Anti-Cheat
+
+```text
+┌─────────────────┐       ┌─────────────────┐       ┌─────────────────┐       ┌──────────────────┐
+│  SCORE SUBMIT   │ ───►  │ CLOUD PUB/SUB   │ ───►  │ CLOUD WORKFLOWS │ ───►  │ ANTI-CHEAT API   │
+│  (Keystroke     │       │ (scores-topic)  │       │ (Orchestrator)  │       │ (Heuristic Eval) │
+│  Telemetries)   │       └─────────────────┘       └────────┬────────┘       └────────┬─────────┘
+└─────────────────┘                                          │                         │
+                                                             │ ◄───────────────────────┘
+                                                             ▼ Decision
+                                                    /─────────────────\
+                                                   /   HUMAN OR BOT?   \
+                                                   \───────────────────/
+                                                     /               \
+                                            HUMAN   /                 \  BOT (ROBOT)
+                                                   ▼                   ▼
+                                            ┌─────────────┐     ┌──────────────┐
+                                            │ SAVE SCORE  │     │ BAN ACCOUNT  │
+                                            │ (Firestore) │     │ (Firestore)  │
+                                            └─────────────┘     └──────────────┘
+```
+
+---
+
+### 🧪 Demonstração de Caso Real: Simulação de Ataque via API (gcurl)
+
+Para simular o comportamento de um trapaceiro tentando injetar um score milionário diretamente no servidor de produção do GCP via terminal (bypassando a interface do navegador), você pode rodar o comando `curl` abaixo:
+
+```bash
+curl -X POST https://tetris-app-55ykz33xga-uc.a.run.app/api/orchestrate/submit-score \
+  -H "Content-Type: application/json" \
+  -d '{
+        "name": "Hacker_GCP",
+        "score": 999999,
+        "level": 20,
+        "lines": 100,
+        "session_id": "PLAYER-4CTTDDI",
+        "keystrokes": []
+      }'
+```
+
+#### 📋 Resposta do Servidor (Log de Auditoria e Banimento do Workflow SAGA):
+O motor serverless de orquestração do GCP reage instantaneamente de forma integrada, bloqueando a requisição e retornando o log detalhado dos passos de segurança distribuídos:
+
+```json
+{
+  "status": "banned",
+  "message": "Uso de Auto-Bot/Cheat detectado pela IA! Sua sessão foi banida permanentemente.",
+  "logs": [
+    "[Workflows] Iniciando fluxo 'submit_score_workflow' para o jogador 'Hacker_GCP'",
+    "[Workflows] Executando consulta HTTP GET -> /api/accounts/status",
+    "[Workflows] Executando chamada HTTP POST -> /api/anti-cheat/analyze (0 teclas coletadas)",
+    "[AntiCheatService] IA classificou o estilo de jogo como: 'ROBOT'",
+    "[Workflows] Decisão: ROTA BOT (Rígida). Acionando banimento de conta.",
+    "[Workflows] Executando chamada HTTP POST -> /api/accounts/ban",
+    "[Workflows] Placar de trapaça descartado. Conta banida da infraestrutura."
+  ]
+}
+```
+
+Isso garante que mesmo que um hacker tente fazer engenharia reversa nas APIs, as defesas automatizadas baseadas em comportamento a nível de infraestrutura protegem o ecossistema de ponta a ponta.
 
 ---
 
