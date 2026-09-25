@@ -1,8 +1,9 @@
-# 🕹️ Retro Neon Tetris — Cloud Run Arcade (Microservices Saga, Anti-Cheat, Observability & DevSecOps Edition)
+# 🕹️ Retro Neon Tetris — Cloud Run Arcade (Projeto Final)
+<p align="left"><font size="5"><i>Sistemas Distribuídos Serverless • Orquestração SAGA • Inteligência Artificial (Gemini & Anti-Cheat) • Mensageria Pub/Sub • Áudio Procedural • Observabilidade GCP • DevSecOps</i></font></p>
 
 Uma versão moderna, estilosa e extremamente sofisticada do clássico jogo **Tetris**, projetada com visual retro-wave/neon (Synthwave) e **Sintetizador de Áudio Procedural** nativo no navegador (usando a Web Audio API).
 
-Esta versão unificada (**Projeto Final**) consolida toda a evolução técnica da aplicação, unindo a **Arquitetura baseada em Microserviços e Orquestração Avançada (SAGA Pattern)**, a **Instrumentação e Observabilidade Nativa no GCP** e a **Automação DevSecOps** com uma pipeline completa de CI/CD via GitHub Actions e portões estritos de segurança e qualidade. O projeto agrega ferramentas automáticas de SAST (Bandit), SCA (Trivy), detecção de segredos (Gitleaks), conformidade sintática (ESLint, Ruff, Hadolint), testes unitários contínuos e implantação contínua segura via WIF no Google Cloud Run.
+Esta versão unificada (**Projeto Final**) consolida toda a evolução técnica da aplicação, unindo a **Arquitetura de Microserviços e Orquestração Avançada (SAGA Pattern)**, a **Inteligência Artificial Aplicada (Gemini AI para Troubleshooting e Heurística Anti-Cheat)**, a **Instrumentação e Observabilidade Nativa no GCP** e a **Automação DevSecOps** com uma pipeline completa de CI/CD via GitHub Actions e portões estritos de segurança e qualidade. O projeto agrega ferramentas automáticas de SAST (Bandit), SCA (Trivy), detecção de segredos (Gitleaks), conformidade sintática (ESLint, Ruff, Hadolint), testes unitários contínuos e implantação contínua segura via WIF no Google Cloud Run.
 
 ## 🎨 Interface do Jogo
 
@@ -122,6 +123,117 @@ Para a entrega consolidada do **Projeto Final**, toda a evolução histórica e 
 ├── tetris-app.jpg             # Captura de tela da interface do jogo
 └── README.md                  # Esta documentação completa do projeto
 ```
+
+---
+
+## 🏛️ Arquitetura e Fluxo de Infraestrutura do Sistema
+
+Para suportar alta escalabilidade, isolamento de privilégios e tolerância a falhas, a infraestrutura da aplicação foi desenhada utilizando serviços 100% serverless, desacoplados e orientados a eventos no **Google Cloud Platform (GCP)**.
+
+O diagrama abaixo ilustra o fluxo de dados de ponta a ponta e a integração entre os componentes de computação, mensageria, persistência, orquestração e observabilidade:
+
+```text
+                                    ┌──────────────────────────────────────────────────────────┐
+                                    │                    FRONTEND (Navegador)                  │
+                                    │  ┌───────────────────────┐    ┌───────────────────────┐  │
+                                    │  │    HTML5 Canvas UI    │    │   Console Maestro UI  │  │
+                                    │  └───────────┬───────────┘    └───────────▲───────────┘  │
+                                    └──────────────┼────────────────────────────┼──────────────┘
+                                                   │                            │
+                                                   │ HTTP Requests / REST       │ Server-Sent Events (SSE)
+                                                   │ (Scores, Skins, Telemetry) │ (Real-Time Orchestration Logs)
+                                                   ▼                            │
+                                    ┌───────────────────────────────────────────┴──────────────┐
+                                    │                 BACKEND (Google Cloud Run)               │
+                                    │  ┌───────────────────────┐    ┌───────────────────────┐  │
+                                    │  │  FastAPI REST Server  │    │  Webhooks (CQRS)      │  │
+                                    │  └───────────┬───────────┘    └───────────▲───────────┘  │
+                                    └──────────────┼────────────────────────────┼──────────────┘
+                                                   │                            │
+                     ┌─────────────────────────────┼────────────────────────────┼─────────────────────────────┐
+                     │ (Chamadas do Workflow)      ▼ (Publicação de Eventos)    ▲ (Push Subscriptions Webhook)│
+                     ▼                             │                            │                             │
+        ┌────────────┴───────────┐         ┌───────┴───────┐            ┌───────┴───────┐         ┌───────────┴───────────┐
+        │   Google Cloud         │         │Google Cloud   │            │ Google Cloud  │         │     Google Cloud      │
+        │   Workflows (SAGA)     │         │Pub/Sub        │            │ Firestore     │         │     Observability     │
+        │                        │         │               │            │ (Database)    │         │                       │
+        │ ┌────────────────────┐ │         │ ┌───────────┐ │            │ ┌───────────┐ │         │ ┌───────────────────┐ │
+        │ │ buy_skin_workflow  │ │         │ │ scores-   │ │            │ │  scores   │ │         │ │   Cloud Logging   │ │
+        │ └────────────────────┘ │         │ │ topic     │ │            │ └───────────┘ │         │ └───────────────────┘ │
+        │ ┌────────────────────┐ │         │ └───────────┘ │            │ ┌───────────┐ │         │ ┌───────────────────┐ │
+        │ │submit_score_workfl │◄├─────────┼───────────────┼───────────►│achieveme- │ │         │ │  Cloud Monitoring │ │
+        │ └────────────────────┘ │         │ ┌───────────┐ │            │ │   nts     │ │         │ └───────────────────┘ │
+        │                        │         │ │ telemetry-│ │            │ └───────────┘ │         │ ┌───────────────────┐ │
+        │                        │         │ │ topic     │ │            │               │         │ │   Cloud Trace     │ │
+        │                        │         │ └───────────┘ │            │               │         │ └───────────────────┘ │
+        └────────────────────────┘         └───────────────┘            └───────────────┘         └───────────────────────┘
+```
+
+---
+
+### 🔄 Funcionamento Detalhado dos Fluxos do Sistema
+
+A arquitetura do **Retro Neon Tetris** é sustentada por três grandes fluxos dinâmicos que implementam padrões avançados de sistemas distribuídos corporativos:
+
+#### 1. Fluxo de Submissão de Score & Anti-Cheat (Arquitetura CQRS)
+Para garantir resiliência contra trapaças e escalabilidade extrema nas leituras, o ranking adota a separação de responsabilidades entre escrita e leitura (CQRS):
+*   **Write/Command Path (Caminho de Escrita Orquestrado):**
+    1.  O jogador finaliza a partida e o frontend submete a pontuação de forma criptografada para o backend FastAPI.
+    2.  O backend apenas publica um evento leve contendo a intenção no tópico **`scores-topic`** do **Cloud Pub/Sub** e responde instantaneamente com `202 Accepted` ao jogador (evitando bloqueios de interface).
+    3.  A assinatura de push do Pub/Sub encaminha de forma assíncrona o evento para o orquestrador **`submit_score_workflow`** do **Cloud Workflows**.
+    4.  O Workflow executa uma **Árvore de Decisão** chamando de volta a rotina heurística do Cloud Run que avalia o ritmo dos toques (detecção de bots).
+    5.  Se a IA detectar trapaça, ela rejeita o score, registra o banimento e loga o incidente. Se passar no teste, o Workflow grava a pontuação de forma oficial no **Cloud Firestore** e notifica o frontend em tempo real.
+*   **Read Path (Caminho de Leitura de Alta Performance):**
+    1.  O frontend solicita o leaderboard global.
+    2.  A API do Cloud Run busca a coleção `scores` do **Firestore** aplicando um **Cache Materializado em memória** com TTL (Time-To-Live). Isso permite atender a milhares de leituras instantâneas em sub-milissegundos sem realizar requisições diretas e dispendiosas ao banco NoSQL para cada jogador.
+
+#### 2. Compra de Skins & Transações Distribuídas (Padrão SAGA Orquestrado)
+Para manter a consistência financeira sem a necessidade de acoplamento rígido de bancos de dados ACID tradicionais, as transações da loja de skins utilizam orquestração serverless pelo padrão SAGA:
+1.  O jogador solicita a compra de um tema neon na loja.
+2.  A chamada HTTP síncrona aciona o backend, que despacha de forma assíncrona a orquestração para o workflow **`buy_skin_workflow`**.
+3.  **Ação Local 1 (Débito):** O workflow efetua o débito das moedas virtuais na carteira do usuário na coleção `users` do Firestore.
+4.  **Ação Local 2 (Entrega):** O workflow tenta registrar a skin no inventário do usuário.
+5.  **Mecanismo de Compensação (Rollback):** Se a etapa de entrega falhar por qualquer motivo (ex: erro de rede, indisponibilidade ou estouro de limite), o motor de workflows detecta a quebra de contrato e dispara de forma automática a **Transação Compensatória**: o reembolso imediato do saldo debitado na carteira, mantendo o estado do sistema consistente e livre de fraudes ou perdas.
+
+#### 3. Telemetria Ativa e Conquistas (Coreografia Event-Driven)
+Enquanto o usuário está jogando, o frontend emite dados em background (taxa de linhas limpas por segundo, velocidade, nível alcançado):
+1.  As métricas de telemetria são recebidas pelo endpoint `/api/telemetry` no Cloud Run.
+2.  Os payloads estruturados são injetados diretamente no tópico **`telemetry-topic`** do Pub/Sub.
+3.  Assinantes paralelos processam as estatísticas agregadas e atualizam de forma assíncrona a coleção **`achievements`** no Firestore se o jogador desbloquear novos troféus (badges), gerando notificações visuais otimistas no painel do navegador.
+
+#### 4. Observabilidade Nativa e Diagnóstico de Erros (Telemetry Loop)
+Toda a infraestrutura se beneficia de um ciclo fechado de observabilidade estruturada:
+*   **Traces Distribuídos:** Cada requisição do jogador gera um ID de trace único (`X-Cloud-Trace-Context`) que é propagado pelo Cloud Run, Pub/Sub e Workflows. Isso permite gerar gráficos de Gantt no **Cloud Trace** para identificar gargalos em microsegundos.
+*   **Logs Estruturados:** Logs de erro do frontend (capturados via `window.onerror`) e logs estruturados em JSON do backend são integrados no **Cloud Logging** e agregados diretamente no **GCP Error Reporting** para alertas proativos em tempo real.
+
+---
+
+## 🔌 Especificação da API REST (Contratos de Microserviços)
+
+Para garantir o desacoplamento de lógicas (Mural de Scores, Inventário de Skins, Carteira Virtual, IA de Detecção), o backend implementa um conjunto de **APIs REST atômicas** que atuam como contratos claros de comunicação.
+
+Abaixo está o catálogo completo das rotas disponíveis e seu respectivo papel operacional:
+
+| Método | Endpoint | Escopo / Microserviço | Descrição Operacional |
+| :---: | :--- | :--- | :--- |
+| **`GET`** | `/api/scores` | Mural de Ranking (CQRS) | Retorna o ranking global dos 10 melhores recordes (Placar de Líderes). Usufrui de **Cache Materializado** em memória. |
+| **`POST`** | `/api/scores` | Mural de Ranking (CQRS) | Envia uma intenção de score. Em produção, publica o payload no Pub/Sub e retorna `202 Accepted` de forma assíncrona. |
+| **`POST`** | `/api/telemetry` | Telemetria e Conquistas | Recebe os pacotes de dados do jogo em background durante a partida e os injeta no barramento de eventos (`telemetry-topic`). |
+| **`GET`** | `/api/achievements/{session_id}` | Conquistas / Badges | Retorna a lista de troféus e conquistas desbloqueadas para a sessão de jogo informada. |
+| **`GET`** | `/api/wallet/{session_id}` | Carteira Virtual | Consulta o saldo atualizado de moedas virtuais do usuário associado à sessão. |
+| **`POST`** | `/api/wallet/debit` | Carteira Virtual | Executa o débito de moedas (Ação do Workflow SAGA). Protegido contra saldo insuficiente. |
+| **`POST`** | `/api/wallet/credit` | Carteira Virtual | Executa o crédito de moedas (Ação de Recompensa / Compensação SAGA). |
+| **`GET`** | `/api/inventory/{session_id}` | Inventário de Temas | Lista todas as skins adquiridas e desbloqueadas pelo jogador daquela sessão. |
+| **`POST`** | `/api/inventory/unlock` | Inventário de Temas | Desbloqueia permanentemente uma skin no inventário do usuário (Ação do Workflow SAGA). |
+| **`POST`** | `/api/inventory/select` | Inventário de Temas | Ativa e seleciona uma skin específica do inventário do usuário para exibição visual no jogo. |
+| **`GET`** | `/api/store/catalog/{session_id}` | Loja de Skins | Consulta o catálogo de skins disponíveis para compra, exibindo preços e estado de aquisição. |
+| **`POST`** | `/api/orchestrate/buy-skin` | Orquestração SAGA | Ponto de entrada do usuário para a compra de skins. Inicializa de forma assíncrona o `buy_skin_workflow`. |
+| **`POST`** | `/api/orchestrate/submit-score` | Orquestração SAGA | Ponto de entrada para submissão de pontuação. Inicializa de forma assíncrona o `submit_score_workflow`. |
+| **`POST`** | `/api/anti-cheat/analyze` | IA / Motor de Segurança | API que analisa a cadência temporal de digitação do jogador e retorna se a partida foi jogada por Humano ou Bot. |
+| **`POST`** | `/api/accounts/ban` | Segurança / Contas | Endpoint de segurança que restringe/bane de forma permanente sessões detectadas como trapaceiras. |
+| **`POST`** | `/api/logs` | Observabilidade Centralizada | Recebe telemetria de erros e exceções ocorridas no Javascript do Navegador e as injeta no Cloud Logging. |
+| **`POST`** | `/api/internal/scores-worker` | Pub/Sub Push Webhook | Endpoint receptor (Webhook) que consome o `scores-topic` via assinatura de push do Pub/Sub para persistência de dados. |
+| **`POST`** | `/api/internal/telemetry-worker` | Pub/Sub Push Webhook | Endpoint receptor (Webhook) que consome o `telemetry-topic` para processar e destravar conquistas assíncronas. |
 
 ---
 
