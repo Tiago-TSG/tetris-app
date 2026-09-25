@@ -7,7 +7,7 @@ Esta versão unificada (**Projeto Final**) consolida toda a evolução técnica 
 
 ## 🎨 Interface do Jogo
 
-![Tela do Jogo Tetris Neon](tetris-app.jpg)
+![Tela do Jogo Tetris Neon](img/tetris-app.jpg)
 
 *Visualização da interface com estilo neon synthwave, exibindo o canvas do jogo (centro), controles (esquerda), próximas peças e estatísticas (direita) com sistema de ranking integrado.*
 
@@ -120,8 +120,9 @@ Para a entrega consolidada do **Projeto Final**, toda a evolução histórica e 
 ├── .dockerignore              # Exclusão de arquivos desnecessários na imagem Docker
 ├── .gitignore                 # Exclusão de arquivos de versionamento e venv
 ├── .trivyignore               # Exceções de vulnerabilidade de pacotes upstream homologadas
-├── tetris-app.jpg             # Captura de tela da interface do jogo
-├── ai_report.png              # Captura de tela do relatório de diagnóstico emitido pelo Gemini
+├── img/                       # Pasta com as imagens e capturas de tela da documentação
+│   ├── ai_report.png          # Captura de tela do relatório de diagnóstico emitido pelo Gemini
+│   └── tetris-app.jpg         # Captura de tela da interface do jogo
 └── README.md                  # Esta documentação completa do projeto
 ```
 
@@ -219,7 +220,7 @@ A Inteligência Artificial é integrada ao **Retro Neon Tetris** em duas frentes
 *   **Contexto:** Integrado à esteira de **DevSecOps (GitHub Actions)**.
 *   **Funcionamento:** Quando ocorre uma falha em qualquer portão de qualidade (Lint, SAST, Testes ou Build), a Action customizada `.github/actions/gemini-troubleshoot` é disparada. O agente extrai os logs da CLI do GitHub (`gh run view --log-failed`), detecta automaticamente a causa raiz e gera um diagnóstico com sugestões precisas de patches de código no próprio console da pipeline, economizando tempo precioso de debugging.
 
-![Relatório do Agente de IA no Console do Actions](ai_report.png)
+![Relatório do Agente de IA no Console do Actions](img/ai_report.png)
 
 *Exemplo de relatório dinâmico emitido de forma autônoma pela API do Gemini ao detectar falhas em etapas lógicas do repositório.*
 

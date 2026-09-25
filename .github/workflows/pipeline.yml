@@ -8,6 +8,7 @@ on:
       - '**.md'
       - '.github/workflows/**'
       - '.github/actions/**'
+      - 'img/**'
   pull_request:
     branches:
       - main
@@ -15,6 +16,7 @@ on:
       - '**.md'
       - '.github/workflows/**'
       - '.github/actions/**'
+      - 'img/**'
 
 env:
   PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
